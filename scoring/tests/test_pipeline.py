@@ -1,4 +1,9 @@
-from digiscore.pipeline import run
+import json
+from pathlib import Path
+
+import pytest
+
+from digiscore.pipeline import _zone, run
 
 
 def _base(**over):
@@ -52,6 +57,25 @@ def test_bon_payeur_montant_ok():
     assert not r.thin_file
 
 
+def test_score_result_preserve_le_contrat_de_serialisation():
+    payload = run(_base()).model_dump()
+    assert set(payload) == {
+        "eligible",
+        "thin_file",
+        "score_global",
+        "criteres",
+        "knockouts",
+        "montant_demande",
+        "montant_eligible",
+        "montant_max_suggestion",
+        "message_code",
+        "message_humain",
+        "explication",
+        "zone",
+        "financials",
+    }
+
+
 def test_thin_file():
     r = run(
         _base(
@@ -73,6 +97,8 @@ def test_thin_file():
 def test_compte_gele():
     r = run(_base(membre={"id": 10, "anciennete_mois": 70, "statut": "gele"}))
     assert r.message_code == "COMPTE_INACTIF"
+    assert not r.eligible
+    assert r.montant_eligible == 0
 
 
 def test_rcsd_knockout():
@@ -96,6 +122,8 @@ def test_rcsd_knockout():
         )
     )
     assert any(k.code == "KNOCKOUT_RCSD" for k in r.knockouts)
+    assert not r.eligible
+    assert r.montant_eligible == 0
 
 
 def test_voie_exceptionnelle():
@@ -129,3 +157,113 @@ def test_preuves_externes_manquantes():
         )
     )
     assert r.message_code == "PREUVES_EXTERNES_MANQUANTES"
+
+
+@pytest.mark.parametrize(
+    ("score", "expected_zone"),
+    [(40, "rejet"), (41, "analyse"), (70, "analyse"), (71, "approbation")],
+)
+def test_zone_boundaries(score, expected_zone):
+    assert _zone(score) == expected_zone
+
+
+@pytest.mark.parametrize(
+    ("demande", "expected_code"),
+    [
+        ({"exclusion_esg": True, "situation_fiscale": "en_regle"}, "KNOCKOUT_ESG"),
+        ({"situation_fiscale": "non_conforme"}, "BIC_OU_FISCAL_MANQUANT"),
+        (
+            {
+                "montant": 2_000_000,
+                "seuil_caution": 2_000_000,
+                "nb_cautions_eligibles": 0,
+                "nb_cautions_min": 1,
+                "situation_fiscale": "en_regle",
+            },
+            "CAUTION_REQUISE",
+        ),
+    ],
+)
+def test_knockouts_refusent_sans_plafond(demande, expected_code):
+    r = run(_base(demande=demande))
+    assert r.message_code == expected_code
+    assert r.zone == "rejet"
+    assert not r.eligible
+    assert r.montant_eligible == 0
+    assert r.montant_max_suggestion is None
+
+
+def test_knockout_priority_is_stable():
+    r = run(
+        _base(
+            historique={"credits_ailleurs": True, "preuves_externes_ok": False},
+            demande={"exclusion_esg": True, "situation_fiscale": "non_conforme"},
+        )
+    )
+    assert r.message_code == "PREUVES_EXTERNES_MANQUANTES"
+    assert [k.code for k in r.knockouts][:3] == [
+        "KNOCKOUT_ESG",
+        "PREUVES_EXTERNES_MANQUANTES",
+        "BIC_OU_FISCAL_MANQUANT",
+    ]
+
+
+def test_plafond_est_arrondi_vers_le_bas():
+    r = run(
+        _base(
+            analyse={"revenu_perso": 205_000},
+            demande={"montant": 600_001, "situation_fiscale": "en_regle"},
+        )
+    )
+    # Le plafond brut RCSD est ~815 151 FCFA : il ne doit jamais monter à 820 000.
+    assert r.montant_eligible == 810_000
+
+
+def test_cas_attendus_de_demo():
+    expected = {
+        1: _base(),
+        2: _base(
+            historique={"epargne_moy_3m": 100_000, "epargne_moy_6m": 100_000},
+            demande={
+                "montant": 2_900_000,
+                "duree_mois": 60,
+                "seuil_caution": 3_000_000,
+                "situation_fiscale": "en_regle",
+            }
+        ),
+        3: _base(historique={"incidents": [{"gravite": "grave"}]}),
+        4: _base(
+            membre={"id": 4, "anciennete_mois": 2, "statut": "actif"},
+            historique={"credits_passes": [], "epargne_moy_6m": 20_000, "nb_mouvements_90j": 1},
+            demande={"montant": 400_000, "duree_mois": 8, "situation_fiscale": "en_regle"},
+        ),
+        8: _base(
+            analyse={"ca": 800_000, "cmv": 550_000, "charges_exploitation": 300_000},
+            demande={"montant": 800_000, "situation_fiscale": "en_regle"},
+        ),
+        9: _base(
+            demande={
+                "montant": 10_000_000,
+                "duree_mois": 24,
+                "plafond_produit": 12_000_000,
+                "exceptionnel": True,
+                "seuil_caution": 2_000_000,
+                "nb_cautions_eligibles": 2,
+                "nb_cautions_min": 2,
+                "situation_fiscale": "en_regle",
+            },
+            analyse={"ca": 18_000_000, "cmv": 8_000_000, "charges_exploitation": 2_500_000},
+        ),
+        10: _base(membre={"id": 10, "anciennete_mois": 70, "statut": "gele"}),
+    }
+    payload = json.loads(
+        (Path(__file__).parents[2] / "data" / "synthetic" / "cas_attendus.json").read_text()
+    )
+
+    for case in payload["cas"]:
+        result = run(expected[case["id"]])
+        assert result.message_code in case["message_codes_ok"]
+        if "thin_file" in case:
+            assert result.thin_file is case["thin_file"]
+        if "score_min" in case:
+            assert result.score_global >= case["score_min"]

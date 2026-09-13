@@ -14,6 +14,7 @@ def caf(a: AnalyseIn) -> float:
 
 
 def service_credit_sollicite(demande: DemandeIn) -> float:
+    """Estime le service annuel du crédit demandé avec un taux simple de 1,8 %/an."""
     if demande.duree_mois <= 0:
         return demande.montant
     interet = demande.montant * 0.018 * (demande.duree_mois / 12)

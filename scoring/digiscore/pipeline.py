@@ -52,6 +52,9 @@ def run(dossier: dict | DossierInput) -> ScoreResult:
     zone = _zone(score)
     if knockouts:
         zone = "rejet"
+        # Un knockout est un refus : aucun montant ne doit être présenté comme éligible.
+        eligible_amt = 0
+        suggestion = None
 
     code = "MONTANT_OK"
     if any(k["code"] == "COMPTE_INACTIF" for k in knockouts):

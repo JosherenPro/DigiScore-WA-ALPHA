@@ -1,3 +1,5 @@
+from math import floor
+
 from digiscore.types import DossierInput
 
 
@@ -7,11 +9,11 @@ def is_thin_file(d: DossierInput) -> bool:
     return d.membre.anciennete_mois < 3 or (len(soldes) == 0 and faible_activite)
 
 
-def montant_par_rcsd(fin: dict, demande_duree: int) -> float:
-    """Montant max tel que CAF / (charges_existantes + service) >= 1.5 approximé."""
+def montant_par_rcsd(fin: dict, demande_duree: int, service_dette_existant: float = 0) -> float:
+    """Montant max respectant RCSD >= 1,50 après prise en compte des dettes en cours."""
     caf = fin["caf"]
-    # service annuel max = CAF / 1.5
-    service_max = max(0, caf / 1.5)
+    # CAF / (service existant + nouveau service) >= 1.5.
+    service_max = max(0, caf / 1.5 - service_dette_existant)
     # service ~ montant * 1.1 / duree * 12
     if demande_duree <= 0:
         return service_max
@@ -28,7 +30,11 @@ def compute_plafond(d: DossierInput, fin: dict, score: float, thin: bool) -> tup
     if any(c.statut == "impaye" for c in d.historique.credits_passes):
         hist_bonus = 0.35
 
-    cap_rcsd = montant_par_rcsd(fin, d.demande.duree_mois)
+    cap_rcsd = montant_par_rcsd(
+        fin,
+        d.demande.duree_mois,
+        d.analyse.charge_credits_en_cours,
+    )
     raw = min(d.demande.plafond_produit, (base_epargne + base_caf) * hist_bonus, cap_rcsd)
     if thin:
         raw = min(raw, max(50000, d.historique.epargne_moy_6m * 3), 250000)
@@ -37,7 +43,8 @@ def compute_plafond(d: DossierInput, fin: dict, score: float, thin: bool) -> tup
     elif score < 71:
         raw *= 0.75
 
-    eligible = max(0, round(raw / 10000) * 10000)
+    # Arrondir vers le bas évite de proposer un montant supérieur au plafond brut.
+    eligible = max(0, floor(raw / 10000) * 10000)
     suggestion = None
     if score >= 80 and not thin and eligible > d.demande.montant * 1.15:
         suggestion = min(d.demande.plafond_produit, round(eligible * 1.1 / 10000) * 10000)
