@@ -2,7 +2,7 @@
   {"id": 1, "membre": "MEM-001", "objet": "Renouvellement stock boutique", "montant": 500000, "message_attendu": "MONTANT_OK"},
   {"id": 2, "membre": "MEM-002", "objet": "Agrandissement etal", "montant": 2500000, "message_attendu": "MONTANT_PLAFONNE"},
   {"id": 3, "membre": "MEM-003", "objet": "Relance activite", "montant": 300000, "message_attendu": "INCIDENTS_RECENTS"},
-  {"id": 4, "membre": "MEM-004", "objet": "Premier credit commerce", "montant": 400000, "message_attendu": "HISTORIQUE_INSUFFISANT"},
+  {"id": 4, "membre": "MEM-004", "objet": "Premier credit commerce", "montant": 400000, "message_attendu": "KNOCKOUT_RCSD"},
   {"id": 5, "membre": "MEM-005", "objet": "Petit materiel", "montant": 250000, "message_attendu": "MONTANT_OK"},
   {"id": 6, "membre": "MEM-006", "objet": "Intrants campagne", "montant": 600000, "message_attendu": "MONTANT_OK"},
   {"id": 7, "membre": "MEM-007", "objet": "Fonds de roulement", "montant": 450000, "message_attendu": "MONTANT_OK"},

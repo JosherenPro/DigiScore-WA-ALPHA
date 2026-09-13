@@ -49,7 +49,7 @@ Logins démo : `agent` · `chef` · `cic`.
 | Membre | Scénario |
 |--------|----------|
 | MEM-001 Kodjo Mensah | Bon payeur → score haut, `MONTANT_OK` → chef valide |
-| MEM-004 Aisha Slim | Thin-file → message historique insuffisant |
+| MEM-004 Aisha Slim | Thin-file + RCSD insuffisant → `KNOCKOUT_RCSD` |
 | MEM-009 Isaac Gbeglo | 10 M + cautions → file **CIC** voie exceptionnelle |
 | MEM-010 Compte Gele | Compte gelé → aucune demande |
 
