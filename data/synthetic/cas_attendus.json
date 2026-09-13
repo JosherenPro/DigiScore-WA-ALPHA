@@ -1,0 +1,11 @@
+{
+  "cas": [
+    {"id": 1, "code": "MEM-001", "message_codes_ok": ["MONTANT_OK", "UPSELL_POSSIBLE"], "thin_file": false, "score_min": 60},
+    {"id": 2, "code": "MEM-002", "message_codes_ok": ["MONTANT_PLAFONNE"], "thin_file": false},
+    {"id": 3, "code": "MEM-003", "message_codes_ok": ["INCIDENTS_RECENTS", "KNOCKOUT_RCSD"], "thin_file": false},
+    {"id": 4, "code": "MEM-004", "message_codes_ok": ["HISTORIQUE_INSUFFISANT", "BIC_OU_FISCAL_MANQUANT"], "thin_file": true},
+    {"id": 8, "code": "MEM-008", "message_codes_ok": ["KNOCKOUT_RCSD", "REJET_SCORE"], "thin_file": false},
+    {"id": 9, "code": "MEM-009", "message_codes_ok": ["VOIE_EXCEPTIONNELLE"], "thin_file": false},
+    {"id": 10, "code": "MEM-010", "message_codes_ok": ["COMPTE_INACTIF"], "statut": "gele"}
+  ]
+}

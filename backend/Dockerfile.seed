@@ -1,0 +1,7 @@
+FROM python:3.12-slim
+WORKDIR /app
+RUN pip install --no-cache-dir "psycopg[binary]>=3.2"
+COPY db/seed/generate_volume_csv.py db/seed/load_volume_csv.py db/seed/entrypoint_seed.py ./
+ENV VOLUME_DIR=/data/volume
+ENV PYTHONUNBUFFERED=1
+CMD ["python", "entrypoint_seed.py"]

@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: digiscore
+      POSTGRES_PASSWORD: digiscore
+      POSTGRES_DB: digiscore
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./backend/db/seed/02_metier.sql:/docker-entrypoint-initdb.d/02_metier.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U digiscore"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  adminer:
+    image: adminer:4
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  db-seed:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.seed
+    environment:
+      DATABASE_URL: postgresql://digiscore:digiscore@postgres:5432/digiscore
+      VOLUME_DIR: /data/volume
+      LOAD_VOLUME: ${LOAD_VOLUME:-1}
+      VOLUME_MEMBERS: ${VOLUME_MEMBERS:-120000}
+      VOLUME_APPLICATIONS: ${VOLUME_APPLICATIONS:-8000}
+    volumes:
+      - ./data/synthetic/volume:/data/volume
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  pgdata:

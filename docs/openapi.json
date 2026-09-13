@@ -1,0 +1,2337 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "DigiScore-WA API",
+    "description": "Copilote d'éligibilité et de plafond — institutions CIF. Contrat Front ↔ Back (clés JSON FR).",
+    "version": "0.2.0"
+  },
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login",
+        "operationId": "login_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/produits": {
+      "get": {
+        "tags": [
+          "demandes"
+        ],
+        "summary": "List Produits",
+        "operationId": "list_produits_produits_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProduitOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Produits Produits Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/membres": {
+      "get": {
+        "tags": [
+          "membres"
+        ],
+        "summary": "Search Membres",
+        "operationId": "search_membres_membres_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 30,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageMembres"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/membres/{membre_id}": {
+      "get": {
+        "tags": [
+          "membres"
+        ],
+        "summary": "Get Membre",
+        "operationId": "get_membre_membres__membre_id__get",
+        "parameters": [
+          {
+            "name": "membre_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Membre Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembreDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/membres/{membre_id}/historique": {
+      "get": {
+        "tags": [
+          "membres"
+        ],
+        "summary": "Historique",
+        "operationId": "historique_membres__membre_id__historique_get",
+        "parameters": [
+          {
+            "name": "membre_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Membre Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembreDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/demandes": {
+      "post": {
+        "tags": [
+          "demandes"
+        ],
+        "summary": "Create Demande",
+        "operationId": "create_demande_demandes_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemandeCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemandeCreateOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "demandes"
+        ],
+        "summary": "List Demandes",
+        "operationId": "list_demandes_demandes_get",
+        "parameters": [
+          {
+            "name": "statut",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Statut"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 30,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageDemandes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/demandes/{demande_id}/collecte": {
+      "post": {
+        "tags": [
+          "demandes"
+        ],
+        "summary": "Save Collecte",
+        "operationId": "save_collecte_demandes__demande_id__collecte_post",
+        "parameters": [
+          {
+            "name": "demande_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Demande Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollecteIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/demandes/{demande_id}/pieces": {
+      "post": {
+        "tags": [
+          "demandes"
+        ],
+        "summary": "Add Piece",
+        "operationId": "add_piece_demandes__demande_id__pieces_post",
+        "parameters": [
+          {
+            "name": "demande_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Demande Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PieceIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/demandes/{demande_id}": {
+      "get": {
+        "tags": [
+          "demandes"
+        ],
+        "summary": "Get Demande",
+        "operationId": "get_demande_demandes__demande_id__get",
+        "parameters": [
+          {
+            "name": "demande_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Demande Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemandeDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/demandes/{demande_id}/analyser": {
+      "post": {
+        "tags": [
+          "workflow"
+        ],
+        "summary": "Analyser",
+        "operationId": "analyser_demandes__demande_id__analyser_post",
+        "parameters": [
+          {
+            "name": "demande_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Demande Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/demandes/{demande_id}/soumettre": {
+      "post": {
+        "tags": [
+          "workflow"
+        ],
+        "summary": "Soumettre",
+        "operationId": "soumettre_demandes__demande_id__soumettre_post",
+        "parameters": [
+          {
+            "name": "demande_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Demande Id"
+            }
+          },
+          {
+            "name": "utilisateur_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "title": "Utilisateur Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SoumettreOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/demandes/{demande_id}/decision": {
+      "post": {
+        "tags": [
+          "workflow"
+        ],
+        "summary": "Decision",
+        "operationId": "decision_demandes__demande_id__decision_post",
+        "parameters": [
+          {
+            "name": "demande_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Demande Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionResultOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/demandes/{demande_id}/memo": {
+      "get": {
+        "tags": [
+          "workflow"
+        ],
+        "summary": "Memo",
+        "operationId": "memo_demandes__demande_id__memo_get",
+        "parameters": [
+          {
+            "name": "demande_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Demande Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/demandes/{demande_id}/amortissement": {
+      "get": {
+        "tags": [
+          "workflow"
+        ],
+        "summary": "Amortissement",
+        "operationId": "amortissement_demandes__demande_id__amortissement_get",
+        "parameters": [
+          {
+            "name": "demande_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Demande Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AmortissementOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/files/chef": {
+      "get": {
+        "tags": [
+          "workflow"
+        ],
+        "summary": "File Chef",
+        "operationId": "file_chef_files_chef_get",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 30,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageDemandes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/files/cic": {
+      "get": {
+        "tags": [
+          "workflow"
+        ],
+        "summary": "File Cic",
+        "operationId": "file_cic_files_cic_get",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 30,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageDemandes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vision/portefeuille": {
+      "get": {
+        "tags": [
+          "vision"
+        ],
+        "summary": "Vision M6",
+        "operationId": "vision_m6_vision_portefeuille_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisionPortefeuilleOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vision/recouvrement": {
+      "get": {
+        "tags": [
+          "vision"
+        ],
+        "summary": "Vision M7",
+        "operationId": "vision_m7_vision_recouvrement_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisionRecouvrementOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "sante"
+        ],
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AmortissementOut": {
+        "properties": {
+          "montant": {
+            "type": "number",
+            "title": "Montant"
+          },
+          "duree_mois": {
+            "type": "integer",
+            "title": "Duree Mois"
+          },
+          "lignes": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Lignes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "montant",
+          "duree_mois",
+          "lignes"
+        ],
+        "title": "AmortissementOut"
+      },
+      "CollecteIn": {
+        "properties": {
+          "ca": {
+            "type": "number",
+            "title": "Ca",
+            "default": 0
+          },
+          "cmv": {
+            "type": "number",
+            "title": "Cmv",
+            "default": 0
+          },
+          "charges_exploitation": {
+            "type": "number",
+            "title": "Charges Exploitation",
+            "default": 0
+          },
+          "produits_financiers": {
+            "type": "number",
+            "title": "Produits Financiers",
+            "default": 0
+          },
+          "revenu_perso": {
+            "type": "number",
+            "title": "Revenu Perso",
+            "default": 0
+          },
+          "charge_familiale": {
+            "type": "number",
+            "title": "Charge Familiale",
+            "default": 0
+          },
+          "charge_credits_en_cours": {
+            "type": "number",
+            "title": "Charge Credits En Cours",
+            "default": 0
+          },
+          "fonds_propres": {
+            "type": "number",
+            "title": "Fonds Propres",
+            "default": 0
+          },
+          "total_dettes": {
+            "type": "number",
+            "title": "Total Dettes",
+            "default": 0
+          },
+          "actif_total": {
+            "type": "number",
+            "title": "Actif Total",
+            "default": 0
+          },
+          "actif_circulant": {
+            "type": "number",
+            "title": "Actif Circulant",
+            "default": 0
+          },
+          "passif_circulant": {
+            "type": "number",
+            "title": "Passif Circulant",
+            "default": 0
+          },
+          "stock_moyen": {
+            "type": "number",
+            "title": "Stock Moyen",
+            "default": 0
+          },
+          "resultat_net": {
+            "type": "number",
+            "title": "Resultat Net",
+            "default": 0
+          },
+          "preuve_revenu": {
+            "type": "string",
+            "title": "Preuve Revenu",
+            "default": "N1"
+          },
+          "preuve_charge": {
+            "type": "string",
+            "title": "Preuve Charge",
+            "default": "N1"
+          },
+          "saisonnier": {
+            "type": "boolean",
+            "title": "Saisonnier",
+            "default": false
+          },
+          "type_activite": {
+            "type": "string",
+            "title": "Type Activite",
+            "default": "commerce"
+          },
+          "valeur_garanties": {
+            "type": "number",
+            "title": "Valeur Garanties",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "CollecteIn"
+      },
+      "CompteOut": {
+        "properties": {
+          "numero": {
+            "type": "string",
+            "title": "Numero"
+          },
+          "statut": {
+            "type": "string",
+            "title": "Statut"
+          },
+          "solde": {
+            "type": "number",
+            "title": "Solde"
+          },
+          "epargne_moy_6m": {
+            "type": "number",
+            "title": "Epargne Moy 6M"
+          }
+        },
+        "type": "object",
+        "required": [
+          "numero",
+          "statut",
+          "solde",
+          "epargne_moy_6m"
+        ],
+        "title": "CompteOut"
+      },
+      "CreditPasseOut": {
+        "properties": {
+          "montant": {
+            "type": "number",
+            "title": "Montant"
+          },
+          "statut": {
+            "type": "string",
+            "title": "Statut"
+          },
+          "nb_retards": {
+            "type": "integer",
+            "title": "Nb Retards"
+          },
+          "jours_max_retard": {
+            "type": "integer",
+            "title": "Jours Max Retard"
+          }
+        },
+        "type": "object",
+        "required": [
+          "montant",
+          "statut",
+          "nb_retards",
+          "jours_max_retard"
+        ],
+        "title": "CreditPasseOut"
+      },
+      "CritereOut": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "note": {
+            "type": "number",
+            "title": "Note"
+          },
+          "poids": {
+            "type": "number",
+            "title": "Poids"
+          },
+          "contribution": {
+            "type": "number",
+            "title": "Contribution"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "note",
+          "poids",
+          "contribution"
+        ],
+        "title": "CritereOut"
+      },
+      "DecisionIn": {
+        "properties": {
+          "niveau": {
+            "type": "string",
+            "title": "Niveau"
+          },
+          "avis": {
+            "type": "string",
+            "title": "Avis"
+          },
+          "motif": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motif"
+          },
+          "utilisateur_id": {
+            "type": "integer",
+            "title": "Utilisateur Id",
+            "default": 1
+          },
+          "override": {
+            "type": "boolean",
+            "title": "Override",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "niveau",
+          "avis"
+        ],
+        "title": "DecisionIn"
+      },
+      "DecisionOut": {
+        "properties": {
+          "niveau": {
+            "type": "string",
+            "title": "Niveau"
+          },
+          "avis": {
+            "type": "string",
+            "title": "Avis"
+          },
+          "motif": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motif"
+          },
+          "override": {
+            "type": "boolean",
+            "title": "Override",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "niveau",
+          "avis"
+        ],
+        "title": "DecisionOut"
+      },
+      "DecisionResultOut": {
+        "properties": {
+          "statut": {
+            "type": "string",
+            "title": "Statut"
+          },
+          "override": {
+            "type": "boolean",
+            "title": "Override"
+          }
+        },
+        "type": "object",
+        "required": [
+          "statut",
+          "override"
+        ],
+        "title": "DecisionResultOut"
+      },
+      "DemandeCreate": {
+        "properties": {
+          "membre_id": {
+            "type": "integer",
+            "title": "Membre Id"
+          },
+          "produit_id": {
+            "type": "integer",
+            "title": "Produit Id",
+            "default": 1
+          },
+          "objet": {
+            "type": "string",
+            "title": "Objet"
+          },
+          "montant_demande": {
+            "type": "number",
+            "title": "Montant Demande"
+          },
+          "duree_mois": {
+            "type": "integer",
+            "title": "Duree Mois",
+            "default": 12
+          },
+          "agent_id": {
+            "type": "integer",
+            "title": "Agent Id",
+            "default": 1
+          },
+          "situation_fiscale": {
+            "type": "string",
+            "title": "Situation Fiscale",
+            "default": "non_fourni"
+          },
+          "credits_ailleurs": {
+            "type": "boolean",
+            "title": "Credits Ailleurs",
+            "default": false
+          },
+          "preuves_externes_ok": {
+            "type": "boolean",
+            "title": "Preuves Externes Ok",
+            "default": false
+          },
+          "collecte": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CollecteIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "membre_id",
+          "objet",
+          "montant_demande"
+        ],
+        "title": "DemandeCreate"
+      },
+      "DemandeCreateOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "statut": {
+            "type": "string",
+            "title": "Statut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "statut"
+        ],
+        "title": "DemandeCreateOut"
+      },
+      "DemandeDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "membre_id": {
+            "type": "integer",
+            "title": "Membre Id"
+          },
+          "objet": {
+            "type": "string",
+            "title": "Objet"
+          },
+          "montant_demande": {
+            "type": "number",
+            "title": "Montant Demande"
+          },
+          "duree_mois": {
+            "type": "integer",
+            "title": "Duree Mois"
+          },
+          "statut": {
+            "type": "string",
+            "title": "Statut"
+          },
+          "situation_fiscale": {
+            "type": "string",
+            "title": "Situation Fiscale"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScoreBloc"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ratios": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RatiosOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionOut"
+            },
+            "type": "array",
+            "title": "Decisions"
+          },
+          "pieces": {
+            "items": {
+              "$ref": "#/components/schemas/PieceOut"
+            },
+            "type": "array",
+            "title": "Pieces"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "membre_id",
+          "objet",
+          "montant_demande",
+          "duree_mois",
+          "statut",
+          "situation_fiscale"
+        ],
+        "title": "DemandeDetail"
+      },
+      "DemandeListItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "membre": {
+            "type": "string",
+            "title": "Membre"
+          },
+          "membre_id": {
+            "type": "integer",
+            "title": "Membre Id"
+          },
+          "montant_demande": {
+            "type": "number",
+            "title": "Montant Demande"
+          },
+          "statut": {
+            "type": "string",
+            "title": "Statut"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "message_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Code"
+          },
+          "zone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "membre",
+          "membre_id",
+          "montant_demande",
+          "statut"
+        ],
+        "title": "DemandeListItem"
+      },
+      "DossierRecouvrementOut": {
+        "properties": {
+          "membre_id": {
+            "type": "integer",
+            "title": "Membre Id"
+          },
+          "niveau": {
+            "type": "integer",
+            "title": "Niveau"
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          },
+          "responsable": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responsable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "membre_id",
+          "niveau"
+        ],
+        "title": "DossierRecouvrementOut"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "service": {
+            "type": "string",
+            "title": "Service"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "service"
+        ],
+        "title": "HealthOut"
+      },
+      "IncidentOut": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "gravite": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gravite"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "date": {
+            "type": "string",
+            "title": "Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "date"
+        ],
+        "title": "IncidentOut"
+      },
+      "KnockoutOut": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "detail"
+        ],
+        "title": "KnockoutOut"
+      },
+      "LoginIn": {
+        "properties": {
+          "login": {
+            "type": "string",
+            "title": "Login",
+            "examples": [
+              "agent"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "login"
+        ],
+        "title": "LoginIn"
+      },
+      "LoginOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "login": {
+            "type": "string",
+            "title": "Login"
+          },
+          "nom": {
+            "type": "string",
+            "title": "Nom"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "login",
+          "nom",
+          "role"
+        ],
+        "title": "LoginOut"
+      },
+      "MembreDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "code_externe": {
+            "type": "string",
+            "title": "Code Externe"
+          },
+          "nom": {
+            "type": "string",
+            "title": "Nom"
+          },
+          "prenom": {
+            "type": "string",
+            "title": "Prenom"
+          },
+          "telephone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telephone"
+          },
+          "statut": {
+            "type": "string",
+            "title": "Statut"
+          },
+          "zone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone"
+          },
+          "date_adhesion": {
+            "type": "string",
+            "title": "Date Adhesion"
+          },
+          "anciennete_mois": {
+            "type": "integer",
+            "title": "Anciennete Mois"
+          },
+          "thin_file": {
+            "type": "boolean",
+            "title": "Thin File"
+          },
+          "compte": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CompteOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "credits_passes": {
+            "items": {
+              "$ref": "#/components/schemas/CreditPasseOut"
+            },
+            "type": "array",
+            "title": "Credits Passes"
+          },
+          "incidents": {
+            "items": {
+              "$ref": "#/components/schemas/IncidentOut"
+            },
+            "type": "array",
+            "title": "Incidents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code_externe",
+          "nom",
+          "prenom",
+          "statut",
+          "date_adhesion",
+          "anciennete_mois",
+          "thin_file"
+        ],
+        "title": "MembreDetail"
+      },
+      "MembreListItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "code_externe": {
+            "type": "string",
+            "title": "Code Externe"
+          },
+          "nom": {
+            "type": "string",
+            "title": "Nom"
+          },
+          "prenom": {
+            "type": "string",
+            "title": "Prenom"
+          },
+          "statut": {
+            "type": "string",
+            "title": "Statut"
+          },
+          "date_adhesion": {
+            "type": "string",
+            "title": "Date Adhesion"
+          },
+          "agence_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agence Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code_externe",
+          "nom",
+          "prenom",
+          "statut",
+          "date_adhesion"
+        ],
+        "title": "MembreListItem"
+      },
+      "MemoOut": {
+        "properties": {
+          "titre": {
+            "type": "string",
+            "title": "Titre"
+          },
+          "client": {
+            "type": "string",
+            "title": "Client"
+          },
+          "projet": {
+            "type": "string",
+            "title": "Projet"
+          },
+          "demande": {
+            "type": "number",
+            "title": "Demande"
+          },
+          "analyse": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RatiosOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "score": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScoreBloc"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "avis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avis"
+          },
+          "rubriques": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rubriques"
+          }
+        },
+        "type": "object",
+        "required": [
+          "titre",
+          "client",
+          "projet",
+          "demande",
+          "rubriques"
+        ],
+        "title": "MemoOut"
+      },
+      "OkOut": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "OkOut"
+      },
+      "PageDemandes": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DemandeListItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "page_size",
+          "total"
+        ],
+        "title": "PageDemandes"
+      },
+      "PageMembres": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MembreListItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "page_size",
+          "total"
+        ],
+        "title": "PageMembres"
+      },
+      "ParOut": {
+        "properties": {
+          "agence_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agence Id"
+          },
+          "par30": {
+            "type": "number",
+            "title": "Par30"
+          },
+          "par90": {
+            "type": "number",
+            "title": "Par90"
+          }
+        },
+        "type": "object",
+        "required": [
+          "par30",
+          "par90"
+        ],
+        "title": "ParOut"
+      },
+      "PieceIn": {
+        "properties": {
+          "type_piece": {
+            "type": "string",
+            "title": "Type Piece"
+          },
+          "fichier": {
+            "type": "string",
+            "title": "Fichier",
+            "default": "upload/demo.jpg"
+          },
+          "qualite_ocr": {
+            "type": "string",
+            "title": "Qualite Ocr",
+            "default": "ok"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type_piece"
+        ],
+        "title": "PieceIn"
+      },
+      "PieceOut": {
+        "properties": {
+          "type_piece": {
+            "type": "string",
+            "title": "Type Piece"
+          },
+          "qualite_ocr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualite Ocr"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type_piece"
+        ],
+        "title": "PieceOut"
+      },
+      "ProduitOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "libelle": {
+            "type": "string",
+            "title": "Libelle"
+          },
+          "montant_max": {
+            "type": "number",
+            "title": "Montant Max"
+          },
+          "seuil_montant_caution": {
+            "type": "number",
+            "title": "Seuil Montant Caution"
+          },
+          "exceptionnel": {
+            "type": "boolean",
+            "title": "Exceptionnel"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "libelle",
+          "montant_max",
+          "seuil_montant_caution",
+          "exceptionnel"
+        ],
+        "title": "ProduitOut"
+      },
+      "RatiosOut": {
+        "properties": {
+          "caf": {
+            "type": "number",
+            "title": "Caf"
+          },
+          "rcsd": {
+            "type": "number",
+            "title": "Rcsd"
+          },
+          "ebe": {
+            "type": "number",
+            "title": "Ebe"
+          }
+        },
+        "type": "object",
+        "required": [
+          "caf",
+          "rcsd",
+          "ebe"
+        ],
+        "title": "RatiosOut"
+      },
+      "ScoreBloc": {
+        "properties": {
+          "score_global": {
+            "type": "number",
+            "title": "Score Global"
+          },
+          "thin_file": {
+            "type": "boolean",
+            "title": "Thin File"
+          },
+          "eligible": {
+            "type": "boolean",
+            "title": "Eligible"
+          },
+          "montant_eligible": {
+            "type": "number",
+            "title": "Montant Eligible"
+          },
+          "montant_max_suggestion": {
+            "type": "number",
+            "title": "Montant Max Suggestion"
+          },
+          "message_code": {
+            "type": "string",
+            "title": "Message Code"
+          },
+          "message_humain": {
+            "type": "string",
+            "title": "Message Humain"
+          },
+          "criteres": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Criteres"
+          },
+          "knockouts": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knockouts"
+          },
+          "explication": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explication"
+          },
+          "zone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone"
+          }
+        },
+        "type": "object",
+        "required": [
+          "score_global",
+          "thin_file",
+          "eligible",
+          "montant_eligible",
+          "montant_max_suggestion",
+          "message_code",
+          "message_humain"
+        ],
+        "title": "ScoreBloc"
+      },
+      "ScoreResult": {
+        "properties": {
+          "eligible": {
+            "type": "boolean",
+            "title": "Eligible"
+          },
+          "thin_file": {
+            "type": "boolean",
+            "title": "Thin File"
+          },
+          "score_global": {
+            "type": "number",
+            "title": "Score Global"
+          },
+          "criteres": {
+            "items": {
+              "$ref": "#/components/schemas/CritereOut"
+            },
+            "type": "array",
+            "title": "Criteres"
+          },
+          "knockouts": {
+            "items": {
+              "$ref": "#/components/schemas/KnockoutOut"
+            },
+            "type": "array",
+            "title": "Knockouts"
+          },
+          "montant_demande": {
+            "type": "number",
+            "title": "Montant Demande"
+          },
+          "montant_eligible": {
+            "type": "number",
+            "title": "Montant Eligible"
+          },
+          "montant_max_suggestion": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Montant Max Suggestion"
+          },
+          "message_code": {
+            "type": "string",
+            "title": "Message Code"
+          },
+          "message_humain": {
+            "type": "string",
+            "title": "Message Humain"
+          },
+          "explication": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Explication"
+          },
+          "zone": {
+            "type": "string",
+            "title": "Zone"
+          },
+          "financials": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Financials"
+          }
+        },
+        "type": "object",
+        "required": [
+          "eligible",
+          "thin_file",
+          "score_global",
+          "criteres",
+          "knockouts",
+          "montant_demande",
+          "montant_eligible",
+          "message_code",
+          "message_humain",
+          "explication",
+          "zone"
+        ],
+        "title": "ScoreResult"
+      },
+      "SoumettreOut": {
+        "properties": {
+          "statut": {
+            "type": "string",
+            "title": "Statut"
+          },
+          "file": {
+            "type": "string",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "statut",
+          "file"
+        ],
+        "title": "SoumettreOut"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VisionPortefeuilleOut": {
+        "properties": {
+          "module": {
+            "type": "string",
+            "title": "Module"
+          },
+          "par": {
+            "items": {
+              "$ref": "#/components/schemas/ParOut"
+            },
+            "type": "array",
+            "title": "Par"
+          },
+          "alertes": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Alertes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "module",
+          "par",
+          "alertes"
+        ],
+        "title": "VisionPortefeuilleOut"
+      },
+      "VisionRecouvrementOut": {
+        "properties": {
+          "module": {
+            "type": "string",
+            "title": "Module"
+          },
+          "dossiers": {
+            "items": {
+              "$ref": "#/components/schemas/DossierRecouvrementOut"
+            },
+            "type": "array",
+            "title": "Dossiers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "module",
+          "dossiers"
+        ],
+        "title": "VisionRecouvrementOut"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "sante",
+      "description": "Liveness de l'API."
+    },
+    {
+      "name": "auth",
+      "description": "Login démo (agent / chef / cic). Pas de JWT."
+    },
+    {
+      "name": "membres",
+      "description": "Lookup paginé (code, nom, account_no) et fiche historique."
+    },
+    {
+      "name": "demandes",
+      "description": "Création, collecte A–E, pièces, liste paginée."
+    },
+    {
+      "name": "workflow",
+      "description": "Analyse, soumission, décision, mémo, files chef/CIC."
+    },
+    {
+      "name": "vision",
+      "description": "Maquettes M6 portefeuille et M7 recouvrement."
+    }
+  ]
+}

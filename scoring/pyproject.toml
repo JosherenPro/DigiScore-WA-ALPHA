@@ -1,0 +1,16 @@
+[project]
+name = "digiscore"
+version = "0.1.0"
+description = "Moteur de score et de plafond DigiScore-WA (regles explicables)"
+requires-python = ">=3.11"
+dependencies = ["pydantic>=2.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["digiscore*"]

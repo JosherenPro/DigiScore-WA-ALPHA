@@ -1,0 +1,84 @@
+# Aperçu. Source de vérité : docs/openapi.json (python backend/scripts/export_openapi.py) ou GET /openapi.json.
+openapi: 3.1.0
+info:
+  title: DigiScore-WA API
+  version: 0.2.0
+  description: Copilote d'éligibilité et de plafond — contrat Front ↔ Back.
+servers:
+  - url: http://localhost:8000
+paths:
+  /health:
+    get:
+      summary: Santé
+      responses:
+        "200":
+          description: OK
+  /auth/login:
+    post:
+      summary: Login démo (agent | chef | cic)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [login]
+              properties:
+                login: { type: string, example: agent }
+  /membres:
+    get:
+      summary: Recherche membre indexée
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+  /membres/{membre_id}:
+    get:
+      summary: Fiche membre + résumé historique
+  /membres/{membre_id}/historique:
+    get:
+      summary: Historique institutionnel
+  /produits:
+    get:
+      summary: Produits crédit
+  /demandes:
+    get:
+      summary: Liste des demandes
+      parameters:
+        - in: query
+          name: statut
+          schema: { type: string }
+    post:
+      summary: Créer une demande liée à un membre
+  /demandes/{demande_id}:
+    get:
+      summary: Demande + score + ratios + décisions
+  /demandes/{demande_id}/collecte:
+    post:
+      summary: Saisie financière A–E
+  /demandes/{demande_id}/analyser:
+    post:
+      summary: Pipeline scoring + persistance
+  /demandes/{demande_id}/soumettre:
+    post:
+      summary: Soumettre au chef ou au CIC
+  /demandes/{demande_id}/decision:
+    post:
+      summary: Avis chef / CIC (motif si override)
+  /demandes/{demande_id}/memo:
+    get:
+      summary: Mémo de crédit
+  /demandes/{demande_id}/amortissement:
+    get:
+      summary: Tableau d'amortissement sur montant retenu
+  /files/chef:
+    get:
+      summary: File chef d'agence
+  /files/cic:
+    get:
+      summary: File CIC
+  /vision/portefeuille:
+    get:
+      summary: Maquette M6
+  /vision/recouvrement:
+    get:
+      summary: Maquette M7

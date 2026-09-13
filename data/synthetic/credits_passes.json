@@ -1,0 +1,11 @@
+[
+  {"membre_id": 1, "montant": 400000, "statut": "solde", "nb_retards": 0, "jours_max_retard": 0},
+  {"membre_id": 1, "montant": 600000, "statut": "solde", "nb_retards": 0, "jours_max_retard": 0},
+  {"membre_id": 2, "montant": 500000, "statut": "solde", "nb_retards": 1, "jours_max_retard": 5},
+  {"membre_id": 3, "montant": 350000, "statut": "impaye", "nb_retards": 4, "jours_max_retard": 45},
+  {"membre_id": 7, "montant": 250000, "statut": "solde", "nb_retards": 2, "jours_max_retard": 18},
+  {"membre_id": 8, "montant": 200000, "statut": "solde", "nb_retards": 1, "jours_max_retard": 8},
+  {"membre_id": 9, "montant": 2500000, "statut": "solde", "nb_retards": 0, "jours_max_retard": 0},
+  {"membre_id": 9, "montant": 3000000, "statut": "en_cours", "nb_retards": 0, "jours_max_retard": 0},
+  {"membre_id": 11, "montant": 300000, "statut": "solde", "nb_retards": 0, "jours_max_retard": 0}
+]

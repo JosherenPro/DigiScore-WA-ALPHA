@@ -1,0 +1,23 @@
+{
+  "comptes": [
+    {"membre_id": 1, "numero": "CPT-001", "statut": "actif", "solde": 450000, "epargne_moy_6m": 400000},
+    {"membre_id": 2, "numero": "CPT-002", "statut": "actif", "solde": 280000, "epargne_moy_6m": 250000},
+    {"membre_id": 3, "numero": "CPT-003", "statut": "actif", "solde": 40000, "epargne_moy_6m": 40000},
+    {"membre_id": 4, "numero": "CPT-004", "statut": "actif", "solde": 35000, "epargne_moy_6m": 20000},
+    {"membre_id": 5, "numero": "CPT-005", "statut": "actif", "solde": 620000, "epargne_moy_6m": 580000},
+    {"membre_id": 6, "numero": "CPT-006", "statut": "actif", "solde": 180000, "epargne_moy_6m": 150000},
+    {"membre_id": 7, "numero": "CPT-007", "statut": "actif", "solde": 150000, "epargne_moy_6m": 130000},
+    {"membre_id": 8, "numero": "CPT-008", "statut": "actif", "solde": 90000, "epargne_moy_6m": 85000},
+    {"membre_id": 9, "numero": "CPT-009", "statut": "actif", "solde": 1800000, "epargne_moy_6m": 1600000},
+    {"membre_id": 10, "numero": "CPT-010", "statut": "gele", "solde": 10000, "epargne_moy_6m": 9000},
+    {"membre_id": 11, "numero": "CPT-011", "statut": "actif", "solde": 300000, "epargne_moy_6m": 270000},
+    {"membre_id": 12, "numero": "CPT-012", "statut": "actif", "solde": 45000, "epargne_moy_6m": 30000}
+  ],
+  "mouvements_echantillon": [
+    {"compte": "CPT-001", "date": "2026-08-01", "type": "depot", "montant": 80000},
+    {"compte": "CPT-001", "date": "2026-07-01", "type": "depot", "montant": 80000},
+    {"compte": "CPT-005", "date": "2026-08-01", "type": "depot", "montant": 100000},
+    {"compte": "CPT-009", "date": "2026-08-01", "type": "depot", "montant": 200000},
+    {"compte": "CPT-004", "date": "2026-08-15", "type": "depot", "montant": 10000}
+  ]
+}

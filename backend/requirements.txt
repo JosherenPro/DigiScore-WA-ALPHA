@@ -1,0 +1,9 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+sqlalchemy>=2.0.36
+psycopg[binary]>=3.2.0
+pydantic>=2.0
+pydantic-settings>=2.0
+python-multipart>=0.0.12
+# Install the sibling scoring package from the repo root:
+#   pip install -e scoring

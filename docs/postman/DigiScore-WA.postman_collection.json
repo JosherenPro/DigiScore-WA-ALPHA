@@ -1,0 +1,232 @@
+{
+  "info": {
+    "name": "DigiScore-WA",
+    "description": "Smoke API : santé, 3 rôles, MEM-001 / MEM-004 / MEM-009, files chef/CIC, M6/M7.\nIDs seed : demande 1 = MEM-001, 4 = MEM-004, 9 = MEM-009.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8000" },
+    { "key": "demande_mem001", "value": "1" },
+    { "key": "demande_mem004", "value": "4" },
+    { "key": "demande_mem009", "value": "9" }
+  ],
+  "item": [
+    {
+      "name": "Santé",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth — 3 rôles",
+      "item": [
+        {
+          "name": "Login agent",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"login\": \"agent\"\n}" },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "Login chef",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"login\": \"chef\"\n}" },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "Login cic",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"login\": \"cic\"\n}" },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Membres",
+      "item": [
+        {
+          "name": "Lookup MEM-001",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/membres?q=MEM-001&page=1&page_size=30"
+          }
+        },
+        {
+          "name": "Lookup par account_no (préfixe CPTV)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/membres?q=CPTV-&page=1&page_size=10"
+          }
+        },
+        {
+          "name": "Lookup VOL-* (si volume chargé)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/membres?q=VOL-&page=1&page_size=10"
+          }
+        },
+        {
+          "name": "Fiche MEM-001 (id=1)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/membres/1"
+          }
+        },
+        {
+          "name": "Historique MEM-001",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/membres/1/historique"
+          }
+        }
+      ]
+    },
+    {
+      "name": "MEM-001 — analyse / soumettre",
+      "item": [
+        {
+          "name": "GET demande 1",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/demandes/{{demande_mem001}}"
+          }
+        },
+        {
+          "name": "POST analyser",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/demandes/{{demande_mem001}}/analyser"
+          }
+        },
+        {
+          "name": "POST soumettre",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/demandes/{{demande_mem001}}/soumettre?utilisateur_id=1"
+          }
+        },
+        {
+          "name": "GET mémo",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/demandes/{{demande_mem001}}/memo"
+          }
+        },
+        {
+          "name": "GET amortissement",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/demandes/{{demande_mem001}}/amortissement"
+          }
+        }
+      ]
+    },
+    {
+      "name": "MEM-004 — thin-file",
+      "item": [
+        {
+          "name": "Lookup MEM-004",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/membres?q=MEM-004"
+          }
+        },
+        {
+          "name": "Fiche MEM-004 (id=4, thin_file true)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/membres/4"
+          }
+        },
+        {
+          "name": "POST analyser (HISTORIQUE_INSUFFISANT attendu)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/demandes/{{demande_mem004}}/analyser"
+          }
+        }
+      ]
+    },
+    {
+      "name": "MEM-009 — voie CIC",
+      "item": [
+        {
+          "name": "Lookup MEM-009",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/membres?q=MEM-009"
+          }
+        },
+        {
+          "name": "POST analyser (VOIE_EXCEPTIONNELLE attendu)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/demandes/{{demande_mem009}}/analyser"
+          }
+        },
+        {
+          "name": "POST soumettre → file cic",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/demandes/{{demande_mem009}}/soumettre?utilisateur_id=1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Files + vision",
+      "item": [
+        {
+          "name": "File chef",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/files/chef?page=1&page_size=30"
+          }
+        },
+        {
+          "name": "File CIC",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/files/cic?page=1&page_size=30"
+          }
+        },
+        {
+          "name": "M6 portefeuille",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/vision/portefeuille"
+          }
+        },
+        {
+          "name": "M7 recouvrement",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/vision/recouvrement"
+          }
+        },
+        {
+          "name": "Liste demandes paginée",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/demandes?page=1&page_size=30"
+          }
+        }
+      ]
+    }
+  ]
+}
