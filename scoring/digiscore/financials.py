@@ -1,4 +1,5 @@
 from digiscore.types import AnalyseIn, DemandeIn
+from digiscore.policy import CREDIT_SERVICE_RATE
 
 
 def ebe(a: AnalyseIn) -> float:
@@ -17,8 +18,18 @@ def service_credit_sollicite(demande: DemandeIn) -> float:
     """Estime le service annuel du crédit demandé avec un taux simple de 1,8 %/an."""
     if demande.duree_mois <= 0:
         return demande.montant
-    interet = demande.montant * 0.018 * (demande.duree_mois / 12)
+    interet = demande.montant * CREDIT_SERVICE_RATE * (demande.duree_mois / 12)
     return (demande.montant + interet) * (12 / demande.duree_mois)
+
+
+def montant_pour_service(service_annuel: float, duree_mois: int) -> float:
+    """Inverse de ``service_credit_sollicite`` pour une capacité annuelle donnée."""
+    if service_annuel <= 0:
+        return 0.0
+    if duree_mois <= 0:
+        return service_annuel
+    facteur_service = (1 + CREDIT_SERVICE_RATE * (duree_mois / 12)) * (12 / duree_mois)
+    return service_annuel / facteur_service
 
 
 def rcsd(a: AnalyseIn, demande: DemandeIn) -> float:

@@ -215,8 +215,8 @@ def test_plafond_est_arrondi_vers_le_bas():
             demande={"montant": 600_001, "situation_fiscale": "en_regle"},
         )
     )
-    # Le plafond brut RCSD est ~815 151 FCFA : il ne doit jamais monter à 820 000.
-    assert r.montant_eligible == 810_000
+    # Le plafond exact RCSD est ~883 480 FCFA : il est arrondi vers le bas.
+    assert r.montant_eligible == 880_000
 
 
 def test_cas_attendus_de_demo():

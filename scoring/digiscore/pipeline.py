@@ -1,6 +1,12 @@
 from digiscore.financials import compute_all
 from digiscore.limits import compute_plafond, is_thin_file
 from digiscore.messages import render
+from digiscore.policy import (
+    EXCEPTIONAL_AMOUNT_THRESHOLD,
+    FISCAL_DOCUMENT_AMOUNT_THRESHOLD,
+    RCSD_KNOCKOUT_THRESHOLD,
+    select_knockout_message,
+)
 from digiscore.scorecard import compute_score
 from digiscore.types import DossierInput, ScoreResult
 
@@ -28,7 +34,8 @@ def run(dossier: dict | DossierInput) -> ScoreResult:
             {"code": "PREUVES_EXTERNES_MANQUANTES", "detail": "Pieces externes exigibles absentes"}
         )
     if d.demande.situation_fiscale in ("non_conforme",) or (
-        d.demande.montant >= 500000 and d.demande.situation_fiscale == "non_fourni"
+        d.demande.montant >= FISCAL_DOCUMENT_AMOUNT_THRESHOLD
+        and d.demande.situation_fiscale == "non_fourni"
     ):
         knockouts.append({"code": "BIC_OU_FISCAL_MANQUANT", "detail": "Fiscalite / BIC non conforme"})
     if (
@@ -38,7 +45,7 @@ def run(dossier: dict | DossierInput) -> ScoreResult:
         knockouts.append({"code": "CAUTION_REQUISE", "detail": "Cautionnaire eligible manquant"})
 
     fin = compute_all(d.analyse, d.demande)
-    if fin["rcsd"] < 1.0:
+    if fin["rcsd"] < RCSD_KNOCKOUT_THRESHOLD:
         knockouts.append({"code": "KNOCKOUT_RCSD", "detail": f"RCSD={fin['rcsd']}"})
 
     graves = [i for i in d.historique.incidents if i.gravite == "grave"]
@@ -56,31 +63,20 @@ def run(dossier: dict | DossierInput) -> ScoreResult:
         eligible_amt = 0
         suggestion = None
 
-    code = "MONTANT_OK"
-    if any(k["code"] == "COMPTE_INACTIF" for k in knockouts):
-        code = "COMPTE_INACTIF"
-    elif any(k["code"] == "PREUVES_EXTERNES_MANQUANTES" for k in knockouts):
-        code = "PREUVES_EXTERNES_MANQUANTES"
-    elif any(k["code"] == "CAUTION_REQUISE" for k in knockouts):
-        code = "CAUTION_REQUISE"
-    elif any(k["code"] == "KNOCKOUT_RCSD" for k in knockouts):
-        code = "KNOCKOUT_RCSD"
-    elif any(k["code"] == "KNOCKOUT_ESG" for k in knockouts):
-        code = "KNOCKOUT_ESG"
-    elif any(k["code"] == "BIC_OU_FISCAL_MANQUANT" for k in knockouts):
-        code = "BIC_OU_FISCAL_MANQUANT"
-    elif any(k["code"] == "INCIDENTS_RECENTS" for k in knockouts):
-        code = "INCIDENTS_RECENTS"
-    elif thin and d.demande.montant > eligible_amt:
-        code = "HISTORIQUE_INSUFFISANT"
-    elif d.demande.exceptionnel or d.demande.montant >= 8_000_000:
-        code = "VOIE_EXCEPTIONNELLE"
-    elif zone == "rejet":
-        code = "REJET_SCORE"
-    elif d.demande.montant > eligible_amt:
-        code = "MONTANT_PLAFONNE"
-    elif suggestion and suggestion > d.demande.montant:
-        code = "UPSELL_POSSIBLE"
+    code = select_knockout_message(knockouts)
+    if code is None:
+        if thin and d.demande.montant > eligible_amt:
+            code = "HISTORIQUE_INSUFFISANT"
+        elif d.demande.exceptionnel or d.demande.montant >= EXCEPTIONAL_AMOUNT_THRESHOLD:
+            code = "VOIE_EXCEPTIONNELLE"
+        elif zone == "rejet":
+            code = "REJET_SCORE"
+        elif d.demande.montant > eligible_amt:
+            code = "MONTANT_PLAFONNE"
+        elif suggestion and suggestion > d.demande.montant:
+            code = "UPSELL_POSSIBLE"
+        else:
+            code = "MONTANT_OK"
 
     motif = knockouts[0]["detail"] if knockouts else zone
     humain = render(

@@ -1,6 +1,13 @@
 from math import isclose
 
-from digiscore.financials import caf, compute_all, ebe, rcsd, service_credit_sollicite
+from digiscore.financials import (
+    caf,
+    compute_all,
+    ebe,
+    montant_pour_service,
+    rcsd,
+    service_credit_sollicite,
+)
 from digiscore.limits import montant_par_rcsd
 from digiscore.types import AnalyseIn, DemandeIn
 
@@ -38,4 +45,17 @@ def test_service_credit_et_rcsd_prennent_en_compte_la_dette_existante():
     without_existing_debt = montant_par_rcsd(fin, 12)
     with_existing_debt = montant_par_rcsd(fin, 12, a.charge_credits_en_cours)
     assert with_existing_debt < without_existing_debt
-    assert isclose(with_existing_debt, (1_000 / 1.5 - 200) / 1.1, rel_tol=1e-6)
+    assert isclose(
+        with_existing_debt,
+        montant_pour_service(1_000 / 1.5 - 200, 12),
+        rel_tol=1e-6,
+    )
+
+
+def test_montant_pour_service_est_l_inverse_du_service():
+    demande = DemandeIn(montant=500, duree_mois=18)
+    assert isclose(
+        montant_pour_service(service_credit_sollicite(demande), demande.duree_mois),
+        demande.montant,
+        rel_tol=1e-9,
+    )

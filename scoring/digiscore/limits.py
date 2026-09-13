@@ -1,5 +1,7 @@
 from math import floor
 
+from digiscore.financials import montant_pour_service
+from digiscore.policy import RCSD_COMFORT_THRESHOLD
 from digiscore.types import DossierInput
 
 
@@ -13,11 +15,8 @@ def montant_par_rcsd(fin: dict, demande_duree: int, service_dette_existant: floa
     """Montant max respectant RCSD >= 1,50 après prise en compte des dettes en cours."""
     caf = fin["caf"]
     # CAF / (service existant + nouveau service) >= 1.5.
-    service_max = max(0, caf / 1.5 - service_dette_existant)
-    # service ~ montant * 1.1 / duree * 12
-    if demande_duree <= 0:
-        return service_max
-    return service_max * (demande_duree / 12) / 1.1
+    service_max = max(0, caf / RCSD_COMFORT_THRESHOLD - service_dette_existant)
+    return montant_pour_service(service_max, demande_duree)
 
 
 def compute_plafond(d: DossierInput, fin: dict, score: float, thin: bool) -> tuple[float, float | None]:
