@@ -5,6 +5,7 @@ from sklearn.model_selection import train_test_split
 from digiscore.adaptive.scorecard_ml import FEATURE_NAMES, fit_scorecard, predict_scorecard
 from digiscore.anomalies import detect, fit_anomaly
 from digiscore.counterfactual import suggest_counterfactuals
+from digiscore.credit_limit_ml import recommend_credit_limit
 from digiscore.ml import run_ml_assistance
 from digiscore.simulation import simulate_resilience
 from training.generate import generate_dataset
@@ -87,7 +88,24 @@ def test_facade_ml_desactivee_ne_casse_pas_le_moteur():
         "modele": None,
         "probabilite_defaut": None,
         "anomalies": [],
+        "plafond_ml": None,
     }
+
+
+def test_plafond_ml_ne_depasse_jamais_le_plafond_regles():
+    low_risk = recommend_credit_limit(_dossier(), default_probability=0.05)
+    high_risk = recommend_credit_limit(_dossier(), default_probability=0.40)
+    assert low_risk["plafond_ml_recommande"] <= low_risk["plafond_regles"]
+    assert high_risk["plafond_ml_recommande"] < low_risk["plafond_ml_recommande"]
+    assert high_risk["facteur_prudence"] == 0.60
+
+
+def test_plafond_ml_est_bloque_par_un_knockout():
+    dossier = _dossier()
+    dossier["membre"]["statut"] = "gele"
+    result = recommend_credit_limit(dossier, default_probability=0.05)
+    assert result["blocked_by_knockout"] is True
+    assert result["plafond_ml_recommande"] is None
 
 
 def test_anomalie_documentaire_explique_un_revenu_trop_eleve():

@@ -6,6 +6,7 @@ from typing import Any
 
 from digiscore.adaptive.scorecard_ml import ml_enabled, predict_scorecard
 from digiscore.anomalies import detect
+from digiscore.credit_limit_ml import recommend_credit_limit
 from digiscore.types import DossierInput
 
 
@@ -29,9 +30,17 @@ def run_ml_assistance(
             "modele": None,
             "probabilite_defaut": None,
             "anomalies": [],
+            "plafond_ml": None,
         }
     scorecard = predict_scorecard(dossier, financials)
     anomaly = detect(dossier, financials)
+    limit = None
+    if scorecard is not None:
+        limit = recommend_credit_limit(
+            dossier,
+            scorecard.probabilite_defaut,
+            model_version=scorecard.modele_version,
+        )
     return {
         "enabled": scorecard is not None or anomaly["enabled"],
         "modele": None
@@ -46,4 +55,5 @@ def run_ml_assistance(
         "probabilite_defaut": None if scorecard is None else scorecard.probabilite_defaut,
         "anomalies": anomaly["anomalies"],
         "anomaly_score": anomaly["anomaly_score"],
+        "plafond_ml": limit,
     }

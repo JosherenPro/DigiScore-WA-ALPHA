@@ -16,4 +16,4 @@ build-backend = "setuptools.build_meta"
 include = ["digiscore*"]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
+pythonpath = [".", ".."]
