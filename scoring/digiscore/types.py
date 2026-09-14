@@ -5,21 +5,21 @@ from pydantic import BaseModel, Field
 
 class MembreIn(BaseModel):
     id: int
-    anciennete_mois: int = 0
+    anciennete_mois: int = Field(default=0, ge=0)
     statut: str = "actif"
 
 
 class CompteIn(BaseModel):
-    solde: float = 0
-    date_ouverture_jours: int = 365
+    solde: float = Field(default=0, ge=0)
+    date_ouverture_jours: int = Field(default=365, ge=0)
     statut: str = "actif"
 
 
 class CreditPasseIn(BaseModel):
-    montant: float = 0
+    montant: float = Field(default=0, ge=0)
     statut: str = "solde"
-    nb_retards: int = 0
-    jours_max_retard: int = 0
+    nb_retards: int = Field(default=0, ge=0)
+    jours_max_retard: int = Field(default=0, ge=0)
 
 
 class IncidentIn(BaseModel):
@@ -29,31 +29,31 @@ class IncidentIn(BaseModel):
 class HistoriqueIn(BaseModel):
     credits_passes: list[CreditPasseIn] = Field(default_factory=list)
     incidents: list[IncidentIn] = Field(default_factory=list)
-    epargne_moy_3m: float = 0
-    epargne_moy_6m: float = 0
-    nb_mouvements_90j: int = 0
+    epargne_moy_3m: float = Field(default=0, ge=0)
+    epargne_moy_6m: float = Field(default=0, ge=0)
+    nb_mouvements_90j: int = Field(default=0, ge=0)
     credits_ailleurs: bool = False
     preuves_externes_ok: bool = False
 
 
 class DemandeIn(BaseModel):
-    montant: float
-    duree_mois: int = 12
+    montant: float = Field(ge=0)
+    duree_mois: int = Field(default=12, ge=1)
     objet: str = ""
     produit_id: int = 1
-    plafond_produit: float = 3_000_000
-    seuil_caution: float = 2_000_000
+    plafond_produit: float = Field(default=3_000_000, ge=0)
+    seuil_caution: float = Field(default=2_000_000, ge=0)
     exceptionnel: bool = False
     situation_fiscale: str = "non_fourni"
     exclusion_esg: bool = False
-    nb_cautions_eligibles: int = 0
-    nb_cautions_min: int = 1
+    nb_cautions_eligibles: int = Field(default=0, ge=0)
+    nb_cautions_min: int = Field(default=1, ge=0)
 
 
 class TresorerieMois(BaseModel):
-    mois: int
-    flux_entrant: float = 0
-    flux_sortant: float = 0
+    mois: int = Field(ge=1)
+    flux_entrant: float = Field(default=0, ge=0)
+    flux_sortant: float = Field(default=0, ge=0)
 
 
 class PatrimoineIn(BaseModel):
@@ -69,21 +69,21 @@ class PatrimoineIn(BaseModel):
 
 
 class AnalyseIn(BaseModel):
-    ca: float = 0
-    cmv: float = 0
-    charges_exploitation: float = 0
-    produits_financiers: float = 0
-    revenu_perso: float = 0
-    charge_familiale: float = 0
-    charge_credits_en_cours: float = 0
-    fonds_propres: float = 0
-    total_dettes: float = 0
-    actif_total: float = 0
-    actif_circulant: float = 0
-    passif_circulant: float = 0
-    stock_moyen: float = 0
+    ca: float = Field(default=0, ge=0)
+    cmv: float = Field(default=0, ge=0)
+    charges_exploitation: float = Field(default=0, ge=0)
+    produits_financiers: float = Field(default=0, ge=0)
+    revenu_perso: float = Field(default=0, ge=0)
+    charge_familiale: float = Field(default=0, ge=0)
+    charge_credits_en_cours: float = Field(default=0, ge=0)
+    fonds_propres: float = Field(default=0, ge=0)
+    total_dettes: float = Field(default=0, ge=0)
+    actif_total: float = Field(default=0, ge=0)
+    actif_circulant: float = Field(default=0, ge=0)
+    passif_circulant: float = Field(default=0, ge=0)
+    stock_moyen: float = Field(default=0, ge=0)
     resultat_net: float = 0
-    valeur_garanties: float = 0
+    valeur_garanties: float = Field(default=0, ge=0)
     preuve_revenu: str = "N1"
     preuve_charge: str = "N1"
     saisonnier: bool = False
@@ -102,7 +102,7 @@ class DossierInput(BaseModel):
 
 class CritereOut(BaseModel):
     code: str
-    note: float
+    note: float = Field(ge=0, le=100)
     poids: float
     contribution: float
 
@@ -115,7 +115,8 @@ class KnockoutOut(BaseModel):
 class ScoreResult(BaseModel):
     eligible: bool
     thin_file: bool
-    score_global: float
+    # Contrat public DigiScore : le score est toujours exprime sur 100.
+    score_global: float = Field(ge=0, le=100)
     criteres: list[CritereOut]
     knockouts: list[KnockoutOut]
     montant_demande: float

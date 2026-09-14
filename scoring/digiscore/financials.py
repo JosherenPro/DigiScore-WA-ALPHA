@@ -1,4 +1,5 @@
 from digiscore.types import AnalyseIn, DemandeIn
+from digiscore.policy import CREDIT_SERVICE_RATE
 
 
 def ebe(a: AnalyseIn) -> float:
@@ -14,10 +15,21 @@ def caf(a: AnalyseIn) -> float:
 
 
 def service_credit_sollicite(demande: DemandeIn) -> float:
+    """Estime le service annuel du crédit demandé avec un taux simple de 1,8 %/an."""
     if demande.duree_mois <= 0:
         return demande.montant
-    interet = demande.montant * 0.018 * (demande.duree_mois / 12)
+    interet = demande.montant * CREDIT_SERVICE_RATE * (demande.duree_mois / 12)
     return (demande.montant + interet) * (12 / demande.duree_mois)
+
+
+def montant_pour_service(service_annuel: float, duree_mois: int) -> float:
+    """Inverse de ``service_credit_sollicite`` pour une capacité annuelle donnée."""
+    if service_annuel <= 0:
+        return 0.0
+    if duree_mois <= 0:
+        return service_annuel
+    facteur_service = (1 + CREDIT_SERVICE_RATE * (duree_mois / 12)) * (12 / duree_mois)
+    return service_annuel / facteur_service
 
 
 def rcsd(a: AnalyseIn, demande: DemandeIn) -> float:
@@ -28,9 +40,8 @@ def rcsd(a: AnalyseIn, demande: DemandeIn) -> float:
 
 
 def ratios(a: AnalyseIn) -> dict[str, float]:
-    ca = a.ca or 1
-    marge = ((a.ca - a.cmv) / ca) * 100
-    bn = (a.resultat_net / ca) * 100
+    marge = ((a.ca - a.cmv) / a.ca) * 100 if a.ca else 0.0
+    bn = (a.resultat_net / a.ca) * 100 if a.ca else 0.0
     solv = a.fonds_propres / a.total_dettes if a.total_dettes else 99.0
     rot = (a.stock_moyen * 365 / a.cmv) if a.cmv else 0
     part = (a.fonds_propres / a.actif_total * 100) if a.actif_total else 0

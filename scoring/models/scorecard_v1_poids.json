@@ -1,0 +1,38 @@
+{
+  "model_version": "scorecard-v1",
+  "model_type": "logreg",
+  "business_weights": {
+    "note_financier": 0.25,
+    "note_capacite": 0.2,
+    "note_historique": 0.2,
+    "note_activite": 0.15,
+    "note_garanties": 0.1,
+    "note_documents": 0.1
+  },
+  "learned_weights": {
+    "note_financier": 0.03486,
+    "note_capacite": 0.020122,
+    "note_historique": 0.03408,
+    "note_activite": 0.004711,
+    "note_garanties": 0.025203,
+    "note_documents": 0.036255,
+    "anciennete_mois": 0.092336,
+    "rcsd": 0.324417,
+    "epargne_regularite": 0.082157,
+    "incidents_graves": 0.216752,
+    "montant_sur_plafond": 0.129108
+  },
+  "coefficients": {
+    "note_financier": -0.062479,
+    "note_capacite": -0.036063,
+    "note_historique": -0.06108,
+    "note_activite": -0.008444,
+    "note_garanties": -0.045171,
+    "note_documents": -0.064978,
+    "anciennete_mois": -0.16549,
+    "rcsd": -0.581441,
+    "epargne_regularite": -0.147246,
+    "incidents_graves": 0.388476,
+    "montant_sur_plafond": 0.231397
+  }
+}

@@ -154,7 +154,7 @@
           }
         },
         {
-          "name": "POST analyser (HISTORIQUE_INSUFFISANT attendu)",
+          "name": "POST analyser (KNOCKOUT_RCSD attendu)",
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/demandes/{{demande_mem004}}/analyser"

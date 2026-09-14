@@ -59,7 +59,7 @@ Tu n’as pas besoin de FastAPI pour développer. Optionnel : API sur :8000 puis
 | Demande seed | Membre | Attendu typique |
 |--------------|--------|-----------------|
 | 1 | MEM-001 | `MONTANT_OK` / `UPSELL_POSSIBLE` |
-| 4 | MEM-004 | `HISTORIQUE_INSUFFISANT` (thin-file) |
+| 4 | MEM-004 | `KNOCKOUT_RCSD` (thin-file avec capacité insuffisante) |
 | 9 | MEM-009 | `VOIE_EXCEPTIONNELLE` → file CIC |
 
 Swagger : http://localhost:8000/docs · Postman : [postman/README.md](postman/README.md).

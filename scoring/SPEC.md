@@ -1,8 +1,10 @@
 # SPEC moteur DigiScore-WA
 
-Fonction pure : `digiscore.pipeline.run(dossier) ? ScoreResult`. Pas d’accès BDD. Pas de ML dans le routage, les knock-outs ou la décision.
+Fonction pure : `digiscore.pipeline.run(dossier) -> ScoreResult`. Le package n'accÃ¨de ni Ã  la BDD ni au rÃ©seau. Le ML est hors routage, knock-outs et dÃ©cision MVP.
 
-## Entrée (`DossierInput`)
+## Contrat
+
+**EntrÃ©e `DossierInput`** :
 
 ```text
 membre: { id, anciennete_mois, statut }
@@ -11,50 +13,40 @@ historique: { credits_passes[], incidents[], epargne_moy_3m, epargne_moy_6m,
               nb_mouvements_90j, credits_ailleurs, preuves_externes_ok }
 demande: { montant, duree_mois, objet, produit_id, plafond_produit, seuil_caution,
            exceptionnel, situation_fiscale, exclusion_esg, nb_cautions_eligibles, nb_cautions_min }
-analyse: { CA, CMV, charges, revenus/charges ménage, ratios bruts, tresorerie[],
-           patrimoine, preuves N1–N3 }
+analyse: { ca, cmv, charges_exploitation, revenus/charges mÃ©nage, trÃ©sorerie[],
+           patrimoine, preuves N1â€“N3 }
 ```
 
-## Sortie (`ScoreResult`)
+**Sortie `ScoreResult`** : `eligible`, `thin_file`, `score_global` (0â€“100), `criteres[]`, `knockouts[]`, `montant_demande`, `montant_eligible`, `montant_max_suggestion`, `message_code`, `message_humain`, `explication[]`, `zone`, `financials`.
 
-`eligible`, `thin_file`, `score_global` (0–100), `criteres[]`, `knockouts[]`,
-`montant_demande`, `montant_eligible`, `montant_max_suggestion`,
-`message_code`, `message_humain`, `explication[]`, `zone`, `financials`.
+Les champs et `message_code` sont un contrat avec le backend et le frontend : aucun renommage sans coordination.
 
-## Formules
+## Calculs et zones
 
 ```text
-EBE  = CA ? CMV ? Charges_exploitation
-CAF  = EBE + Produits_financiers + (Revenus_perso ? Charges_familiales)
-RCSD = CAF / (Dettes_en_cours + Service_credit_sollicite)
+EBE  = CA âˆ’ CMV âˆ’ charges_exploitation
+CAF  = EBE + produits_financiers + (revenu_perso âˆ’ charge_familiale)
+RCSD = CAF / (charge_credits_en_cours + service_credit_sollicite)
 ```
 
-RCSD ? 1,50 confort · RCSD < 1,00 knock-out.
+Le service demandÃ© est annualisÃ© avec un taux simple indicatif de 1,8 %/an. RCSD < 1,00 est un knockout ; RCSD â‰¥ 1,50 est le seuil de confort utilisÃ© pour le plafond.
 
-Score : `? (note_i/100) × poids_i × 100`  
-Poids : financier 25 · capacité 20 · historique 20 · activité 15 · garanties 10 · documents 10.
+Le score est la somme pondÃ©rÃ©e des notes /100 : financier 25 %, capacitÃ© 20 %, historique 20 %, activitÃ© 15 %, garanties 10 %, documents 10 %. Les zones sont : 0â€“40 rejet recommandÃ©, 41â€“70 analyse/CIC, 71â€“100 approbation recommandÃ©e.
 
-Zones : 0–40 rejet reco · 41–70 analyse/CIC · 71–100 approbation reco.
+## Garde-fous et plafond
 
-## Thin-file
+Les knock-outs sont Ã©valuÃ©s avant le rÃ©sultat mÃ©tier : compte/membre inactif, ESG, preuves externes manquantes, fiscalitÃ©/BIC, caution, RCSD et incidents graves. Leur prioritÃ© suit cet ordre. Un knockout impose `eligible=false`, `zone="rejet"`, `montant_eligible=0` et aucune suggestion.
 
-Ancienneté < 3 mois **ou** (0 crédit soldé **et** épargne/mouvements faibles).
-
-## Plafond
+Un thin-file est un membre de moins de 3 mois, ou sans crÃ©dit soldÃ© avec Ã©pargne 6 mois < 80 000 FCFA et moins de 3 mouvements sur 90 jours.
 
 ```text
-montant_eligible = min(plafond_produit, f(épargne, CAF, historique), capacité RCSD)
+montant_eligible = min(plafond_produit, capacitÃ© Ã©pargne + CAF + historique, capacitÃ© RCSD)
 ```
+corrige
+La capacitÃ© RCSD retire d'abord le service des dettes existantes. Thin-file : min(Ã©pargne Ã— 3, 250 000 FCFA), avec un plancher de 50 000 FCFA. Score < 40 : Ã—0,40 ; zone grise : Ã—0,75. Le montant est arrondi vers le bas Ã  10 000 FCFA. Une suggestion n'est produite que pour score â‰¥ 80, profil non thin-file et capacitÃ© au moins 15 % supÃ©rieure Ã  la demande. Ã€ partir de 8 000 000 FCFA, ou si le produit est exceptionnel, le code est `VOIE_EXCEPTIONNELLE` et la dÃ©cision reste humaine/CIC.
 
-Thin-file : micro-plafond (épargne × 3, cap 250 000). Score < 40 : ×0,4. Zone grise : ×0,75.
+## Messages et exÃ©cution
 
-## Messages
+Codes supportÃ©s : `NON_MEMBRE`, `COMPTE_INACTIF`, `HISTORIQUE_INSUFFISANT`, `EPARGNE_SOUS_SEUIL`, `INCIDENTS_RECENTS`, `MONTANT_PLAFONNE`, `MONTANT_OK`, `UPSELL_POSSIBLE`, `VOIE_EXCEPTIONNELLE`, `REJET_SCORE`, `CAUTION_REQUISE`, `BIC_OU_FISCAL_MANQUANT`, `PREUVES_EXTERNES_MANQUANTES`, `KNOCKOUT_RCSD`, `KNOCKOUT_ESG`.
 
-`NON_MEMBRE`, `COMPTE_INACTIF`, `HISTORIQUE_INSUFFISANT`, `EPARGNE_SOUS_SEUIL`,
-`INCIDENTS_RECENTS`, `MONTANT_PLAFONNE`, `MONTANT_OK`, `UPSELL_POSSIBLE`,
-`VOIE_EXCEPTIONNELLE`, `REJET_SCORE`, `CAUTION_REQUISE`, `BIC_OU_FISCAL_MANQUANT`,
-`PREUVES_EXTERNES_MANQUANTES`, `KNOCKOUT_RCSD`, `KNOCKOUT_ESG`.
-
-## Pipeline
-
-Garde-fous ? financials ? thin-file ? scorecard ? knock-outs ? plafond ? messages.
+Depuis la racine : `pip install -r requirements.txt && pytest scoring/tests`. Depuis `scoring/` : `pytest`.

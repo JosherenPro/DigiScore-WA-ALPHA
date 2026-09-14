@@ -41,7 +41,7 @@ IDs seed `02_metier.sql` (stables tant qu’on n’a pas `down -v` + autre seed)
 2. **3 rôles** — `POST /auth/login` avec `"login": "agent"` puis `chef` puis `cic`.
 3. **Lookup** — `GET /membres?q=MEM-001&page=1&page_size=30` → enveloppe `{ items, page, page_size, total }` (plus une liste nue).
 4. **MEM-001** — `POST /demandes/1/analyser` puis `/soumettre` → file **chef** (`MONTANT_OK` typique). Mémo + amortissement.
-5. **MEM-004** — fiche `thin_file: true` ; analyser → `HISTORIQUE_INSUFFISANT`.
+5. **MEM-004** — fiche `thin_file: true` ; analyser → `KNOCKOUT_RCSD` (la capacité insuffisante est prioritaire).
 6. **MEM-009** — analyser → `VOIE_EXCEPTIONNELLE` ; soumettre → file **cic**.
 7. **Files** — `GET /files/chef` et `/files/cic` (paginés).
 8. **M6 / M7** — `GET /vision/portefeuille` et `/vision/recouvrement`.

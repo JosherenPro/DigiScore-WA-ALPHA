@@ -1,0 +1,14 @@
+{
+  "model_version": "anomaly-v2",
+  "model_type": "isolation_forest",
+  "feature_names": [
+    "log_revenus_sur_epargne",
+    "solde_sur_revenu_mensuel",
+    "patrimoine_sur_fonds_propres",
+    "garanties_sur_demande",
+    "rcsd",
+    "mouvements_90j"
+  ],
+  "seed": 72,
+  "rows": 5000
+}

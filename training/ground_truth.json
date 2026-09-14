@@ -1,0 +1,15 @@
+{
+  "seed": 72,
+  "volume": 20000,
+  "taux_defaut": 0.20035,
+  "coefficients": {
+    "intercept": -1.7,
+    "note_mean": -0.018,
+    "anciennete_mois": -0.012,
+    "rcsd": -1.1,
+    "epargne_regularite": -0.008,
+    "incidents_graves": 1.1,
+    "montant_sur_plafond": 1.2,
+    "noise_std": 0.35
+  }
+}
