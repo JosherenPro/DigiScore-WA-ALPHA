@@ -623,3 +623,26 @@ CREATE TABLE recovery_action (
     note        TEXT
 );
 COMMENT ON TABLE recovery_action IS 'Journal d''actions de recouvrement (M7).';
+
+-- ---------------------------------------------------------------------------
+-- ML consultatif (additif) — GUIDE_ML_BACKEND_DATA.md
+-- ---------------------------------------------------------------------------
+CREATE TABLE resilience_simulation (
+    id                    SERIAL PRIMARY KEY,
+    application_id        INT NOT NULL REFERENCES credit_application (id) ON DELETE CASCADE,
+    scenario              VARCHAR(60) NOT NULL,
+    requested_amount      NUMERIC(14, 0) NOT NULL,
+    term_months           INT NOT NULL,
+    horizon_months        INT NOT NULL,
+    iterations            INT NOT NULL,
+    random_seed           INT NOT NULL,
+    model_version         VARCHAR(40) NOT NULL,
+    incident_probability  NUMERIC(6, 5) NOT NULL,
+    critical_month        INT,
+    result_json           JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_by            INT REFERENCES app_user (id),
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+COMMENT ON TABLE resilience_simulation IS 'Snapshots de simulation de resilience rejouables (seed + result_json).';
+
+CREATE INDEX idx_resilience_application ON resilience_simulation (application_id, created_at DESC);

@@ -1,4 +1,16 @@
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
+from datetime import UTC, datetime
+
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, mapped_column
 
@@ -193,7 +205,9 @@ class CreditApplication(Base):
     has_external_credits = mapped_column(Boolean)
     external_proofs_ok = mapped_column(Boolean)
     esg_exclusion = mapped_column(Boolean)
-    applied_at = mapped_column(DateTime)
+    applied_at = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC), server_default=func.now()
+    )
     agency_id = mapped_column(Integer)
 
 
@@ -327,7 +341,9 @@ class ScoreResult(Base):
     knockouts = mapped_column(JSONB)
     explanation = mapped_column(JSONB)
     engine_version = mapped_column(String)
-    created_at = mapped_column(DateTime)
+    created_at = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC), server_default=func.now()
+    )
 
 
 class ScoreResultHistory(Base):
@@ -346,7 +362,9 @@ class ScoreResultHistory(Base):
     knockouts = mapped_column(JSONB)
     explanation = mapped_column(JSONB)
     engine_version = mapped_column(String)
-    scored_at = mapped_column(DateTime)
+    scored_at = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC), server_default=func.now()
+    )
 
 
 class Decision(Base):
@@ -385,7 +403,9 @@ class FinancialRatio(Base):
     net_worth = mapped_column(Numeric)
     weak_ratio_count = mapped_column(Integer)
     stress_month = mapped_column(Integer)
-    computed_at = mapped_column(DateTime)
+    computed_at = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC), server_default=func.now()
+    )
 
 
 class FinancialRatioHistory(Base):
@@ -404,7 +424,9 @@ class FinancialRatioHistory(Base):
     net_worth = mapped_column(Numeric)
     weak_ratio_count = mapped_column(Integer)
     stress_month = mapped_column(Integer)
-    computed_at = mapped_column(DateTime)
+    computed_at = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC), server_default=func.now()
+    )
 
 
 class AmortizationLine(Base):
@@ -415,6 +437,7 @@ class AmortizationLine(Base):
     installment_amount = mapped_column(Numeric)
     principal = mapped_column(Numeric)
     interest_amount = mapped_column(Numeric)
+    insurance_amount = mapped_column(Numeric)
     remaining_principal = mapped_column(Numeric)
 
 
@@ -468,6 +491,28 @@ class RecoveryAction(Base):
     action_on = mapped_column(Date)
     action_type = mapped_column(String)
     note = mapped_column(Text)
+
+
+class ResilienceSimulation(Base):
+    __tablename__ = "resilience_simulation"
+    id = mapped_column(Integer, primary_key=True)
+    application_id = mapped_column(Integer)
+    scenario = mapped_column(String)
+    requested_amount = mapped_column(Numeric)
+    term_months = mapped_column(Integer)
+    horizon_months = mapped_column(Integer)
+    iterations = mapped_column(Integer)
+    random_seed = mapped_column(Integer)
+    model_version = mapped_column(String)
+    incident_probability = mapped_column(Numeric)
+    critical_month = mapped_column(Integer)
+    result_json = mapped_column(JSONB)
+    created_by = mapped_column(Integer)
+    created_at = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        server_default=func.now(),
+    )
 
 
 class SupportingDocument(Base):

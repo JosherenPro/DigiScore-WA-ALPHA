@@ -1,18 +1,24 @@
-from datetime import date
+from datetime import date, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.tables import (
     Account,
+    AccountMovement,
     Activity,
     ApplicationGuarantee,
     ApplicationGuarantor,
+    BicReport,
     CreditApplication,
     CreditProduct,
+    ExternalAccount,
+    ExternalAccountMovement,
+    ExternalSavingsSnapshot,
     GuarantorReview,
     IncomeExpense,
     Incident,
+    Market,
     Member,
     MonthlyCashflow,
     PastCredit,
@@ -48,8 +54,51 @@ def build_dossier(db: Session, application_id: int) -> dict:
     wealth = db.scalars(select(Wealth).where(Wealth.application_id == app.id)).first()
     cash = db.scalars(select(MonthlyCashflow).where(MonthlyCashflow.application_id == app.id)).all()
     act = db.scalars(select(Activity).where(Activity.application_id == app.id)).first()
+    mkt = db.scalars(select(Market).where(Market.application_id == app.id)).first()
     gars = db.scalars(select(ApplicationGuarantee).where(ApplicationGuarantee.application_id == app.id)).all()
     product = db.get(CreditProduct, app.product_id)
+    # --- v3 : variables point-in-time a applied_at (jamais de fuite future) ---
+    ref_date = app.applied_at.date() if getattr(app, "applied_at", None) else date.today()
+    window_start = ref_date - timedelta(days=90)
+    nb_mvt_90j = 0
+    if account:
+        nb_mvt_90j = db.scalar(
+            select(func.count()).select_from(AccountMovement).where(
+                AccountMovement.account_id == account.id,
+                AccountMovement.moved_on >= window_start,
+                AccountMovement.moved_on <= ref_date,
+            )
+        ) or 0
+        snap = db.scalars(
+            select(SavingsSnapshot)
+            .where(SavingsSnapshot.account_id == account.id, SavingsSnapshot.as_of <= ref_date)
+            .order_by(SavingsSnapshot.as_of.desc())
+            .limit(1)
+        ).first()
+    ext_epargne_6m = 0.0
+    ext_mvt_90j = 0
+    ext_accs = db.scalars(select(ExternalAccount).where(ExternalAccount.member_id == member.id)).all()
+    if ext_accs:
+        ids = [a.id for a in ext_accs]
+        row = db.scalars(
+            select(ExternalSavingsSnapshot)
+            .where(ExternalSavingsSnapshot.account_id.in_(ids), ExternalSavingsSnapshot.as_of <= ref_date)
+            .order_by(ExternalSavingsSnapshot.as_of.desc())
+            .limit(1)
+        ).first()
+        if row:
+            ext_epargne_6m = _num(row.avg_balance_6m)
+        ext_mvt_90j = db.scalar(
+            select(func.count()).select_from(ExternalAccountMovement).where(
+                ExternalAccountMovement.account_id.in_(ids),
+                ExternalAccountMovement.moved_on >= window_start,
+                ExternalAccountMovement.moved_on <= ref_date,
+            )
+        ) or 0
+    bic_incidents = 0
+    bic = db.scalars(select(BicReport).where(BicReport.member_id == member.id)).all()
+    if bic:
+        bic_incidents = max(int(b.bic_incident_count or 0) for b in bic)
     links = db.scalars(
         select(ApplicationGuarantor).where(ApplicationGuarantor.application_id == app.id)
     ).all()
@@ -85,9 +134,12 @@ def build_dossier(db: Session, application_id: int) -> dict:
             "incidents": [{"gravite": i.severity} for i in incidents],
             "epargne_moy_3m": _num(snap.avg_balance_3m) if snap else 0,
             "epargne_moy_6m": _num(snap.avg_balance_6m) if snap else 0,
-            "nb_mouvements_90j": 4 if snap and _num(snap.avg_balance_3m) > 50000 else 1,
+            "nb_mouvements_90j": int(nb_mvt_90j),
             "credits_ailleurs": bool(app.has_external_credits),
             "preuves_externes_ok": bool(app.external_proofs_ok),
+            "ext_epargne_6m": float(ext_epargne_6m),
+            "ext_nb_mouvements_90j": int(ext_mvt_90j),
+            "bic_incidents": int(bic_incidents),
         },
         "demande": {
             "montant": _num(app.requested_amount),
@@ -121,6 +173,9 @@ def build_dossier(db: Session, application_id: int) -> dict:
             "preuve_revenu": ie.income_proof_level if ie else "N1",
             "preuve_charge": ie.expense_proof_level if ie else "N1",
             "saisonnier": bool(act.is_seasonal) if act else False,
+            "dependance_debouche": bool(mkt.single_outlet_dependency) if mkt else False,
+            "concurrence": int(mkt.competitor_count or 0) if mkt else 0,
+            "anciennete_activite_mois": int(act.seniority_months or 12) if act else 12,
             "tresorerie": [
                 {"mois": t.month_no, "flux_entrant": _num(t.inflow), "flux_sortant": _num(t.outflow)}
                 for t in cash
