@@ -1,36 +1,59 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, money, type DemandeResume, type MembreResume } from "../api/client";
+import { api, money, zoneClass, type DemandeResume, type MembreResume } from "../api/client";
+import Pager from "../components/Pager";
+
+const PAGE = 30;
 
 export default function AgentHome({ dossiers = false }: { dossiers?: boolean }) {
   const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [membres, setMembres] = useState<MembreResume[]>([]);
   const [rows, setRows] = useState<DemandeResume[]>([]);
   const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    if (dossiers) {
-      api.demandes().then(setRows).catch((e) => setErr(String(e)));
-    } else {
-      api.membres("").then(setMembres).catch((e) => setErr(String(e)));
-    }
-  }, [dossiers]);
-
-  async function search(e: React.FormEvent) {
-    e.preventDefault();
+  async function loadMembres(query: string, p: number) {
+    setBusy(true);
     setErr("");
     try {
-      setMembres(await api.membres(q));
-    } catch (ex) {
-      setErr(ex instanceof Error ? ex.message : "Erreur");
+      const res = await api.membres(query, p, PAGE);
+      setMembres(res.items);
+      setTotal(res.total);
+      setPage(res.page);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Erreur");
+    } finally {
+      setBusy(false);
     }
   }
+
+  async function loadDemandes(p: number) {
+    setBusy(true);
+    setErr("");
+    try {
+      const res = await api.demandes({ page: p, pageSize: PAGE });
+      setRows(res.items);
+      setTotal(res.total);
+      setPage(res.page);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Erreur");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (dossiers) loadDemandes(1);
+    else loadMembres("", 1);
+  }, [dossiers]);
 
   if (dossiers) {
     return (
       <div className="page">
         <h1>Dossiers</h1>
-        <p className="lede">Demandes seed + nouvelles saisies.</p>
+        <p className="lede">Demandes en base — ouvre un dossier pour le score, le mémo ou la soumission.</p>
         {err && <p className="error">{err}</p>}
         <div className="list">
           {rows.map((d) => (
@@ -44,10 +67,14 @@ export default function AgentHome({ dossiers = false }: { dossiers?: boolean }) 
                   {d.message_code ? ` · ${d.message_code}` : ""}
                 </div>
               </div>
-              <span className="badge">{d.score != null ? `${Math.round(d.score)}/100` : "—"}</span>
+              <span className={`badge ${zoneClass(d.zone)}`}>
+                {d.score != null ? `${Math.round(d.score)}/100` : "—"}
+              </span>
             </Link>
           ))}
         </div>
+        {!busy && rows.length === 0 && !err && <p className="muted">Aucun dossier.</p>}
+        <Pager page={page} pageSize={PAGE} total={total} onPage={loadDemandes} />
       </div>
     );
   }
@@ -55,10 +82,16 @@ export default function AgentHome({ dossiers = false }: { dossiers?: boolean }) 
   return (
     <div className="page">
       <h1>Membre d’abord</h1>
-      <p className="lede">Recherche par code (MEM-001) ou nom. Pas de demande sans compte actif.</p>
-      <form className="search-row" onSubmit={search}>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="MEM-001, Mensah, Slim…" />
-        <button className="btn" type="submit">
+      <p className="lede">Code MEM-001, nom, ou n° de compte. Pas de demande sans compte actif. Ne charge pas 120 000 lignes d’un coup.</p>
+      <form
+        className="search-row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          loadMembres(q, 1);
+        }}
+      >
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="MEM-001, Mensah, CPT-001, VOL-…" />
+        <button className="btn" type="submit" disabled={busy}>
           Chercher
         </button>
       </form>
@@ -70,12 +103,16 @@ export default function AgentHome({ dossiers = false }: { dossiers?: boolean }) 
               <strong>
                 {m.prenom} {m.nom}
               </strong>
-              <div className="muted">{m.code_externe}</div>
+              <div className="muted">
+                {m.code_externe} · adhésion {m.date_adhesion}
+              </div>
             </div>
             <span className={`badge ${m.statut === "actif" ? "ok" : "bad"}`}>{m.statut}</span>
           </Link>
         ))}
       </div>
+      {!busy && membres.length === 0 && !err && <p className="muted">Aucun membre sur cette page.</p>}
+      <Pager page={page} pageSize={PAGE} total={total} onPage={(p) => loadMembres(q, p)} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, NavLink, Route, Routes, useNavigate } from "react-router-dom";
-import { getUser, setUser } from "./auth";
+import { clearSession, getUser, homeFor } from "./auth";
 import Login from "./pages/Login";
 import AgentHome from "./pages/AgentHome";
 import Membre from "./pages/Membre";
@@ -12,34 +13,66 @@ import FileCic from "./pages/FileCic";
 import Portefeuille from "./pages/Portefeuille";
 import Recouvrement from "./pages/Recouvrement";
 
+function RoleGate({ allow, children }: { allow: string[]; children: ReactNode }) {
+  const user = getUser();
+  if (!user) return <Navigate to="/" replace />;
+  if (!allow.includes(user.role)) return <Navigate to={homeFor(user.role)} replace />;
+  return <>{children}</>;
+}
+
 function Shell({ children }: { children: ReactNode }) {
   const user = getUser();
   const nav = useNavigate();
+  const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
+  useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => {
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+    };
+  }, []);
   if (!user) return <Navigate to="/" replace />;
-  const online = typeof navigator === "undefined" ? true : navigator.onLine;
+  const role = user.role;
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div className="brand">DigiScore-WA</div>
+        <NavLink className="brand" to={homeFor(role)}>
+          <img src="/logo-alpha.svg" alt="Équipe Alpha" />
+          DigiScore-WA
+        </NavLink>
         <nav className="nav">
-          {user.role === "agent" && (
+          {role === "agent" && (
             <>
               <NavLink to="/agent">Membres</NavLink>
               <NavLink to="/demandes">Dossiers</NavLink>
             </>
           )}
-          {(user.role === "chef_agence" || user.role === "agent") && <NavLink to="/chef">File chef</NavLink>}
-          {(user.role === "cic" || user.role === "chef_agence") && <NavLink to="/cic">File CIC</NavLink>}
-          <NavLink to="/m6">Portefeuille</NavLink>
-          <NavLink to="/m7">Recouvrement</NavLink>
+          {role === "chef_agence" && (
+            <>
+              <NavLink to="/chef">File chef</NavLink>
+              <NavLink to="/m6">Portefeuille</NavLink>
+              <NavLink to="/m7">Recouvrement</NavLink>
+            </>
+          )}
+          {role === "cic" && (
+            <>
+              <NavLink to="/cic">File CIC</NavLink>
+              <NavLink to="/m6">Portefeuille</NavLink>
+              <NavLink to="/m7">Recouvrement</NavLink>
+            </>
+          )}
         </nav>
         <div className="user-chip">
-          {user.nom} · {user.role}{" "}
+          {user.nom} · {role.replace("_", " ")}
           <button
-            className="btn ghost"
-            style={{ padding: "0.2rem 0.5rem", marginLeft: 8, color: "#fff", borderColor: "#fff" }}
+            className="btn ghost sm"
+            style={{ color: "#fff", borderColor: "rgba(255,255,255,.45)" }}
+            type="button"
             onClick={() => {
-              setUser(null);
+              clearSession();
               nav("/");
             }}
           >
@@ -48,6 +81,7 @@ function Shell({ children }: { children: ReactNode }) {
         </div>
       </header>
       {!online && <div className="offline">Mode dégradé — connexion faible. Le shell PWA reste disponible.</div>}
+      <div className="copilote">Copilote d’éligibilité — le système ne décide jamais seul. Un humain tranche.</div>
       {children}
     </div>
   );
@@ -59,14 +93,59 @@ export default function App() {
       <Route path="/" element={<Login />} />
       <Route path="/agent" element={<Shell><AgentHome /></Shell>} />
       <Route path="/membres/:id" element={<Shell><Membre /></Shell>} />
-      <Route path="/membres/:id/demande" element={<Shell><DemandeWizard /></Shell>} />
+      <Route
+        path="/membres/:id/demande"
+        element={
+          <Shell>
+            <RoleGate allow={["agent"]}>
+              <DemandeWizard />
+            </RoleGate>
+          </Shell>
+        }
+      />
       <Route path="/demandes" element={<Shell><AgentHome dossiers /></Shell>} />
       <Route path="/demandes/:id" element={<Shell><Resultat /></Shell>} />
       <Route path="/demandes/:id/memo" element={<Shell><Memo /></Shell>} />
-      <Route path="/chef" element={<Shell><FileChef /></Shell>} />
-      <Route path="/cic" element={<Shell><FileCic /></Shell>} />
-      <Route path="/m6" element={<Shell><Portefeuille /></Shell>} />
-      <Route path="/m7" element={<Shell><Recouvrement /></Shell>} />
+      <Route
+        path="/chef"
+        element={
+          <Shell>
+            <RoleGate allow={["chef_agence", "cic"]}>
+              <FileChef />
+            </RoleGate>
+          </Shell>
+        }
+      />
+      <Route
+        path="/cic"
+        element={
+          <Shell>
+            <RoleGate allow={["cic"]}>
+              <FileCic />
+            </RoleGate>
+          </Shell>
+        }
+      />
+      <Route
+        path="/m6"
+        element={
+          <Shell>
+            <RoleGate allow={["chef_agence", "cic"]}>
+              <Portefeuille />
+            </RoleGate>
+          </Shell>
+        }
+      />
+      <Route
+        path="/m7"
+        element={
+          <Shell>
+            <RoleGate allow={["chef_agence", "cic"]}>
+              <Recouvrement />
+            </RoleGate>
+          </Shell>
+        }
+      />
     </Routes>
   );
 }

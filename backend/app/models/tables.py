@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, mapped_column
@@ -193,7 +195,7 @@ class CreditApplication(Base):
     has_external_credits = mapped_column(Boolean)
     external_proofs_ok = mapped_column(Boolean)
     esg_exclusion = mapped_column(Boolean)
-    applied_at = mapped_column(DateTime)
+    applied_at = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     agency_id = mapped_column(Integer)
 
 
@@ -283,10 +285,10 @@ class Activity(Base):
     application_id = mapped_column(Integer)
     activity_type = mapped_column(String)
     description = mapped_column(Text)
-    seniority_months = mapped_column(Integer)
+    seniority_months = mapped_column(Integer, default=12)
     location_area = mapped_column(String)
-    is_seasonal = mapped_column(Boolean)
-    proof_level = mapped_column(String)
+    is_seasonal = mapped_column(Boolean, default=False)
+    proof_level = mapped_column(String, default="N1")
 
 
 class ApplicationGuarantee(Base):
@@ -327,7 +329,7 @@ class ScoreResult(Base):
     knockouts = mapped_column(JSONB)
     explanation = mapped_column(JSONB)
     engine_version = mapped_column(String)
-    created_at = mapped_column(DateTime)
+    created_at = mapped_column(DateTime, default=lambda: datetime.now(UTC))
 
 
 class ScoreResultHistory(Base):
@@ -356,7 +358,7 @@ class Decision(Base):
     level = mapped_column(String)
     opinion = mapped_column(String)
     reason = mapped_column(Text)
-    is_override = mapped_column(Boolean)
+    is_override = mapped_column(Boolean, default=False)
     user_id = mapped_column(Integer)
 
 
@@ -385,7 +387,7 @@ class FinancialRatio(Base):
     net_worth = mapped_column(Numeric)
     weak_ratio_count = mapped_column(Integer)
     stress_month = mapped_column(Integer)
-    computed_at = mapped_column(DateTime)
+    computed_at = mapped_column(DateTime, default=lambda: datetime.now(UTC))
 
 
 class FinancialRatioHistory(Base):
