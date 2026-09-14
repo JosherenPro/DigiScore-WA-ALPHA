@@ -85,7 +85,7 @@ ne changent aucune donnée de la demande.
 
 ```json
 {
-  "model_version": "anomaly-rules-v1",
+  "model_version": "anomaly-v2",
   "anomalies": [
     {
       "feature": "ca",
@@ -102,6 +102,10 @@ ne changent aucune donnée de la demande.
 `severity` ne peut être que `a_verifier` dans le MVP. Aucun statut rouge, aucun
 blocage automatique. Le backend calcule les features depuis le dossier déjà
 assemblé ; il ne duplique pas les formules CAF/RCSD du package `scoring/`.
+
+Les thin-files sont hors scope de la détection d'anomalies. Le backend expose
+alors `scope_excluded: true` et une liste vide ; il ne présente pas cela comme
+une anomalie ou comme un refus.
 
 ### BDD
 
@@ -152,7 +156,7 @@ La réponse doit être explicable et reproductible :
 ```json
 {
   "scenario": "mauvaise_recolte",
-  "model_version": "resilience-v1",
+  "model_version": "resilience-v2",
   "seed": 42,
   "p_incident": 0.27,
   "p10": [0, 0, 0],
@@ -202,7 +206,7 @@ retourner un enrichissement distinct :
 
 ```json
 {
-  "model_version": "risk-logistic-v1",
+  "model_version": "scorecard-v2",
   "mode": "shadow",
   "default_probability": 0.07,
   "weights_learned": {
@@ -220,6 +224,11 @@ retourner un enrichissement distinct :
 Le score règles et les poids métier restent affichés en parallèle. Le backend
 ne remplace pas les six poids de `scoring/digiscore/scorecard.py` avec des
 poids appris.
+
+`probabilite_defaut` est exploitable seulement pour l'artefact versionné et le
+jeu de données sur lequel sa calibration a été contrôlée. Le backend affiche
+la version du modèle et ne la présente pas comme une estimation de production
+avant validation sur des historiques réels.
 
 ### Plafond ML indicatif
 

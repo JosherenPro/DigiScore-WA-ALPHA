@@ -59,3 +59,9 @@ def test_montant_pour_service_est_l_inverse_du_service():
         demande.montant,
         rel_tol=1e-9,
     )
+
+
+def test_ratios_restent_nuls_si_le_chiffre_d_affaires_est_nul():
+    financials = compute_all(AnalyseIn(resultat_net=500), DemandeIn(montant=0))
+    assert financials["marge_brute_pct"] == 0
+    assert financials["benefice_net_pct"] == 0

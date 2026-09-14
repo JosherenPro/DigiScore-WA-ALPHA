@@ -40,9 +40,8 @@ def rcsd(a: AnalyseIn, demande: DemandeIn) -> float:
 
 
 def ratios(a: AnalyseIn) -> dict[str, float]:
-    ca = a.ca or 1
-    marge = ((a.ca - a.cmv) / ca) * 100
-    bn = (a.resultat_net / ca) * 100
+    marge = ((a.ca - a.cmv) / a.ca) * 100 if a.ca else 0.0
+    bn = (a.resultat_net / a.ca) * 100 if a.ca else 0.0
     solv = a.fonds_propres / a.total_dettes if a.total_dettes else 99.0
     rot = (a.stock_moyen * 365 / a.cmv) if a.cmv else 0
     part = (a.fonds_propres / a.actif_total * 100) if a.actif_total else 0

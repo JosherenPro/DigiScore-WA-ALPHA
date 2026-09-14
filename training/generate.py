@@ -40,7 +40,7 @@ def generate_dataset(volume: int = 20_000, seed: int = 72) -> tuple[list[dict[st
     rcsd = np.clip(rng.normal(1.45, 0.55, size=n), 0.15, 4.5)
     regularity = np.clip(rng.normal(68.0, 22.0, size=n), 0.0, 100.0)
     incidents = rng.binomial(1, 0.16, size=n).astype(float)
-    amount_ratio = np.clip(rng.normal(0.68, 0.24, size=n), 0.05, 1.5)
+    amount_ratio = np.clip(rng.beta(2.2, 4.8, size=n) * 1.5, 0.05, 1.5)
     note_mean = notes.mean(axis=1)
     logit = (
         GROUND_TRUTH["intercept"]

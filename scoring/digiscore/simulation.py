@@ -7,7 +7,7 @@ from typing import Any
 from digiscore.financials import service_credit_sollicite
 from digiscore.types import DossierInput
 
-MODEL_VERSION = "resilience-v1"
+MODEL_VERSION = "resilience-v2"
 
 
 def _validated(dossier: dict | DossierInput) -> DossierInput:
@@ -85,9 +85,10 @@ def simulate_resilience(
 
     income = max(0.0, 1.0 + income_delta)
     expenses = max(0.0, 1.0 + expense_delta)
-    noise = rng.normal(1.0, 0.08, size=(n_paths, horizon)).clip(0.5, 1.5)
-    inflow_paths = inflow[None, :] * income * noise
-    outflow_paths = outflow[None, :] * expenses * noise
+    inflow_noise = rng.normal(1.0, 0.12, size=(n_paths, horizon)).clip(0.5, 1.5)
+    outflow_noise = rng.normal(1.0, 0.08, size=(n_paths, horizon)).clip(0.5, 1.5)
+    inflow_paths = inflow[None, :] * income * inflow_noise
+    outflow_paths = outflow[None, :] * expenses * outflow_noise
     debt_service = service_credit_sollicite(
         d.demande.model_copy(update={"montant": requested, "duree_mois": duration})
     ) / 12.0

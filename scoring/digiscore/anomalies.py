@@ -6,15 +6,17 @@ anomalie est un signal a montrer a l'agent, jamais un knockout automatique.
 
 from __future__ import annotations
 
+from math import expm1, log1p
 from pathlib import Path
 from typing import Any, Iterable
 
 from digiscore.financials import compute_all
+from digiscore.limits import is_thin_file
 from digiscore.types import DossierInput
 
-MODEL_VERSION = "anomaly-v1"
+MODEL_VERSION = "anomaly-v2"
 ANOMALY_FEATURE_NAMES = (
-    "revenus_sur_epargne",
+    "log_revenus_sur_epargne",
     "solde_sur_revenu_mensuel",
     "patrimoine_sur_fonds_propres",
     "garanties_sur_demande",
@@ -35,7 +37,7 @@ def extract_features(dossier: dict | DossierInput, financials: dict | None = Non
     equity = max(d.analyse.fonds_propres, 1.0)
     requested = max(d.demande.montant, 1.0)
     return {
-        "revenus_sur_epargne": float(max(0.0, d.analyse.ca / epargne)),
+        "log_revenus_sur_epargne": float(log1p(max(0.0, d.analyse.ca / epargne))),
         "solde_sur_revenu_mensuel": float(max(0.0, d.compte.solde / monthly_revenue)),
         "patrimoine_sur_fonds_propres": float(
             max(0.0, d.analyse.actif_total / equity)
@@ -95,7 +97,7 @@ def fit_anomaly(
 
 
 def default_artifact_path() -> Path:
-    return Path(__file__).resolve().parents[1] / "models" / "anomaly_v1.joblib"
+    return Path(__file__).resolve().parents[1] / "models" / "anomaly_v2.joblib"
 
 
 def load_artifact(path: str | Path | None = None) -> dict[str, Any] | None:
@@ -128,10 +130,21 @@ def detect(
 ) -> dict[str, Any]:
     """Retourne un signal explicable, avec fallback silencieux si absent."""
 
+    d = _validated(dossier)
+    if is_thin_file(d):
+        return {
+            "enabled": True,
+            "scope_excluded": True,
+            "anomaly_score": 0.0,
+            "anomalies": [],
+            "model_version": MODEL_VERSION,
+        }
+
     bundle = artifact or load_artifact(artifact_path)
     if not bundle:
         return {
             "enabled": False,
+            "scope_excluded": False,
             "anomaly_score": 0.0,
             "anomalies": [],
             "model_version": None,
@@ -140,7 +153,7 @@ def detect(
     try:
         import numpy as np
 
-        features = extract_features(dossier, financials)
+        features = extract_features(d, financials)
         names = tuple(bundle.get("feature_names", ANOMALY_FEATURE_NAMES))
         matrix = _matrix([features], names)
         model = bundle["model"]
@@ -159,8 +172,8 @@ def detect(
             if abs(z_value) < 1.5:
                 continue
             value = features[name]
-            if name == "revenus_sur_epargne":
-                message = f"Revenus declares {value:.1f}x superieurs a l'epargne moyenne observee."
+            if name == "log_revenus_sur_epargne":
+                message = f"Revenus declares {expm1(value):.1f}x superieurs a l'epargne moyenne observee."
             elif name == "garanties_sur_demande":
                 message = f"Couverture des garanties atypique ({value:.1f}x la demande)."
             elif name == "rcsd":
@@ -177,6 +190,7 @@ def detect(
 
         return {
             "enabled": True,
+            "scope_excluded": False,
             "anomaly_score": anomaly_score,
             "anomalies": explanations,
             "model_version": bundle.get("model_version", MODEL_VERSION),
@@ -184,6 +198,7 @@ def detect(
     except (KeyError, AttributeError, IndexError, TypeError, ValueError):
         return {
             "enabled": False,
+            "scope_excluded": False,
             "anomaly_score": 0.0,
             "anomalies": [],
             "model_version": None,

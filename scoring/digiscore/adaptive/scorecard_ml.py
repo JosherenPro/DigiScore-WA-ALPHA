@@ -23,7 +23,7 @@ from digiscore.scorecard import (
 )
 from digiscore.types import DossierInput
 
-MODEL_VERSION = "scorecard-v1"
+MODEL_VERSION = "scorecard-v2"
 FEATURE_NAMES = (
     "note_financier",
     "note_capacite",
@@ -127,7 +127,6 @@ def fit_scorecard(
             (
                 "classifier",
                 LogisticRegression(
-                    class_weight="balanced",
                     max_iter=500,
                     random_state=seed,
                     solver="lbfgs",
@@ -146,7 +145,7 @@ def fit_scorecard(
 
 
 def default_artifact_path() -> Path:
-    return Path(__file__).resolve().parents[2] / "models" / "scorecard_v1.joblib"
+    return Path(__file__).resolve().parents[2] / "models" / "scorecard_v2.joblib"
 
 
 def load_artifact(path: str | Path | None = None) -> dict[str, Any] | None:

@@ -94,9 +94,9 @@ def train(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", default="training/dataset_v1.csv")
-    parser.add_argument("--artifact", default="scoring/models/scorecard_v1.joblib")
-    parser.add_argument("--weights", default="scoring/models/scorecard_v1_poids.json")
-    parser.add_argument("--metrics", default="scoring/models/scorecard_v1_metrics.json")
+    parser.add_argument("--artifact", default="scoring/models/scorecard_v2.joblib")
+    parser.add_argument("--weights", default="scoring/models/scorecard_v2_poids.json")
+    parser.add_argument("--metrics", default="scoring/models/scorecard_v2_metrics.json")
     parser.add_argument("--seed", type=int, default=72)
     args = parser.parse_args()
     print(json.dumps(train(args.dataset, args.artifact, args.weights, args.metrics, seed=args.seed), ensure_ascii=False))

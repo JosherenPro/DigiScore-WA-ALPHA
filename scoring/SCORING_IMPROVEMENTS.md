@@ -72,6 +72,26 @@ La trajectoire proposée est :
 5. envisager un recalibrage validé par le métier, sans autoriser le modèle à
    lever un knockout.
 
+## Garde-fous ML v2
+
+La scorecard `scorecard-v2` utilise une régression logistique non pondérée. Sa
+sortie peut être nommée `probabilite_defaut` dans le cadre du jeu synthétique,
+car elle n'est plus déformée par `class_weight="balanced"`. Les seuils du
+plafond ML restent indicatifs et devront être recalibrés sur des défauts réels
+avant toute utilisation en production.
+
+La recommandation `plafond_ml_recommande` est toujours inférieure ou égale au
+plafond règles. Un knockout retourne une recommandation `null`. Le montant ML
+ne remplace donc pas RCSD, les garanties, le plafond produit ou le CIC.
+
+Le simulateur de résilience `resilience-v2` applique des aléas indépendants
+aux encaissements et décaissements. Son `p_incident` est une fréquence de
+simulation reproductible par `seed`, pas une probabilité de défaut crédit.
+
+Les anomalies utilisent une feature logarithmique revenus/épargne. Les
+thin-files sont explicitement hors scope de cette détection : ils ne génèrent
+pas d'anomalie automatique seulement parce que leur épargne est faible.
+
 ## Vérifications
 
 Depuis la racine du dépôt :

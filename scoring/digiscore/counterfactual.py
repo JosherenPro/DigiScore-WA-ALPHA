@@ -71,12 +71,6 @@ def suggest_counterfactuals(
     current_duration = max(1, d.demande.duree_mois)
     candidates = [
         (
-            "anciennete_mois",
-            [float(value) for value in range(current_age + 1, max(current_age + 1, 37))],
-            lambda item, value: setattr(item.membre, "anciennete_mois", int(value)),
-            lambda value: value - current_age,
-        ),
-        (
             "epargne_moy_6m",
             [current_savings + step for step in range(10000, 500001, 10000)],
             lambda item, value: setattr(item.historique, "epargne_moy_6m", value),
@@ -94,6 +88,12 @@ def suggest_counterfactuals(
             lambda item, value: setattr(item.demande, "duree_mois", int(value)),
             lambda value: value - current_duration,
         ),
+        (
+            "anciennete_mois",
+            [float(value) for value in range(current_age + 1, max(current_age + 1, 37))],
+            lambda item, value: setattr(item.membre, "anciennete_mois", int(value)),
+            lambda value: value - current_age,
+        ),
     ]
     items: list[dict[str, Any]] = []
     for lever, values, setter, variation in candidates:
@@ -104,6 +104,7 @@ def suggest_counterfactuals(
         items.append(
             {
                 "levier": lever,
+                "unite": "FCFA" if lever in {"epargne_moy_6m", "valeur_garanties"} else "mois",
                 "variation_min": variation(value),
                 "nouvelle_valeur": value,
                 "nouveau_score": result.score_global,
@@ -111,5 +112,4 @@ def suggest_counterfactuals(
                 "message": result.message_code,
             }
         )
-    items.sort(key=lambda item: float(item["variation_min"]))
     return {"blocked_by_knockout": False, "base_score": base.score_global, "items": items}

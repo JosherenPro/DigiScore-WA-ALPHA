@@ -3,7 +3,11 @@ from pathlib import Path
 
 import pytest
 
+from pydantic import ValidationError
+
+from digiscore.limits import compute_plafond, is_thin_file
 from digiscore.pipeline import _zone, run
+from digiscore.types import DemandeIn, DossierInput
 
 
 def _base(**over):
@@ -263,6 +267,46 @@ def test_plafond_est_arrondi_vers_le_bas():
     )
     # Le plafond exact RCSD est ~883 480 FCFA : il est arrondi vers le bas.
     assert r.montant_eligible == 880_000
+
+
+def test_upsell_ne_depasse_jamais_le_plafond_eligible():
+    r = run(_base())
+    assert r.montant_max_suggestion is not None
+    assert r.montant_max_suggestion <= r.montant_eligible
+
+
+def test_score_40_recoit_le_meme_facteur_de_plafond_que_la_zone_rejet():
+    dossier = DossierInput.model_validate(_base())
+    financials = run(_base()).financials
+    thin = is_thin_file(dossier)
+    plafond_40, _ = compute_plafond(dossier, financials, 40, thin)
+    plafond_399, _ = compute_plafond(dossier, financials, 39.9, thin)
+    assert plafond_40 == plafond_399
+
+
+def test_capacite_rcsd_epuisee_ne_reste_pas_eligible():
+    r = run(
+        _base(
+            demande={"montant": 50_000, "duree_mois": 12, "situation_fiscale": "en_regle"},
+            analyse={"charge_credits_en_cours": 1_000_000},
+        )
+    )
+    assert not r.knockouts
+    assert r.message_code == "MONTANT_PLAFONNE"
+    assert r.montant_eligible == 0
+    assert r.eligible is False
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"montant": -1},
+        {"montant": 1, "duree_mois": 0},
+    ],
+)
+def test_demande_refuse_les_valeurs_negatives_ou_une_duree_nulle(payload):
+    with pytest.raises(ValidationError):
+        DemandeIn(**payload)
 
 
 def test_cas_attendus_de_demo():

@@ -17,7 +17,7 @@ def generate_normal_rows(volume: int = 5000, seed: int = 72):
     n = max(100, int(volume))
     values = np.column_stack(
         [
-            np.clip(rng.normal(25.0, 8.0, n), 4.0, 60.0),
+            np.clip(rng.normal(3.15, 0.45, n), 1.0, 5.0),
             np.clip(rng.normal(0.65, 0.25, n), 0.05, 2.0),
             np.clip(rng.normal(3.5, 1.2, n), 0.5, 8.0),
             np.clip(rng.normal(0.55, 0.25, n), 0.0, 1.5),
@@ -51,7 +51,7 @@ def train(output: str | Path, volume: int = 5000, seed: int = 72):
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", default="scoring/models/anomaly_v1.joblib")
+    parser.add_argument("--output", default="scoring/models/anomaly_v2.joblib")
     parser.add_argument("--volume", type=int, default=5000)
     parser.add_argument("--seed", type=int, default=72)
     args = parser.parse_args()

@@ -1,7 +1,7 @@
 from math import floor
 
 from digiscore.financials import montant_pour_service
-from digiscore.policy import RCSD_COMFORT_THRESHOLD
+from digiscore.policy import RCSD_COMFORT_THRESHOLD, SCORE_ANALYSIS_MAX, SCORE_REJECTION_MAX
 from digiscore.types import DossierInput
 
 
@@ -37,14 +37,14 @@ def compute_plafond(d: DossierInput, fin: dict, score: float, thin: bool) -> tup
     raw = min(d.demande.plafond_produit, (base_epargne + base_caf) * hist_bonus, cap_rcsd)
     if thin:
         raw = min(raw, max(50000, d.historique.epargne_moy_6m * 3), 250000)
-    if score < 40:
+    if score <= SCORE_REJECTION_MAX:
         raw *= 0.4
-    elif score < 71:
+    elif score <= SCORE_ANALYSIS_MAX:
         raw *= 0.75
 
     # Arrondir vers le bas évite de proposer un montant supérieur au plafond brut.
     eligible = max(0, floor(raw / 10000) * 10000)
     suggestion = None
     if score >= 80 and not thin and eligible > d.demande.montant * 1.15:
-        suggestion = min(d.demande.plafond_produit, round(eligible * 1.1 / 10000) * 10000)
+        suggestion = eligible
     return eligible, suggestion

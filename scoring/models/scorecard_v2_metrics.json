@@ -1,0 +1,50 @@
+{
+  "model_version": "scorecard-v2",
+  "seed": 72,
+  "rows": 20000,
+  "default_rate": 0.20035,
+  "auc": 0.711472,
+  "brier_score": 0.145203,
+  "calibration": [
+    {
+      "mean_predicted": 0.05571,
+      "fraction_positive": 0.05
+    },
+    {
+      "mean_predicted": 0.087365,
+      "fraction_positive": 0.078
+    },
+    {
+      "mean_predicted": 0.109781,
+      "fraction_positive": 0.098
+    },
+    {
+      "mean_predicted": 0.132214,
+      "fraction_positive": 0.132
+    },
+    {
+      "mean_predicted": 0.155865,
+      "fraction_positive": 0.176
+    },
+    {
+      "mean_predicted": 0.18254,
+      "fraction_positive": 0.16
+    },
+    {
+      "mean_predicted": 0.216368,
+      "fraction_positive": 0.24
+    },
+    {
+      "mean_predicted": 0.25596,
+      "fraction_positive": 0.264
+    },
+    {
+      "mean_predicted": 0.318343,
+      "fraction_positive": 0.338
+    },
+    {
+      "mean_predicted": 0.460911,
+      "fraction_positive": 0.468
+    }
+  ]
+}

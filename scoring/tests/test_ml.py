@@ -1,5 +1,5 @@
 import numpy as np
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import brier_score_loss, roc_auc_score
 from sklearn.model_selection import train_test_split
 
 from digiscore.adaptive.scorecard_ml import FEATURE_NAMES, fit_scorecard, predict_scorecard
@@ -67,6 +67,8 @@ def test_scorecard_appris_rejouable_et_auc():
     p_second = second["model"].predict_proba(x_test)[:, 1]
     assert np.allclose(p_first, p_second)
     assert roc_auc_score(test_labels, p_first) >= 0.70
+    assert abs(float(np.mean(p_first)) - float(np.mean(test_labels))) < 0.03
+    assert brier_score_loss(test_labels, p_first) < 0.18
 
 
 def test_scorecard_prediction_est_sur_100_et_expliquable():
@@ -76,7 +78,7 @@ def test_scorecard_prediction_est_sur_100_et_expliquable():
     assert result is not None
     assert 0 <= result.score_global <= 100
     assert 0 <= result.probabilite_defaut <= 1
-    assert result.modele_version == "scorecard-v1"
+    assert result.modele_version == "scorecard-v2"
     assert result.contributions
     assert {item["feature"] for item in result.contributions} == set(FEATURE_NAMES)
 
@@ -88,6 +90,8 @@ def test_facade_ml_desactivee_ne_casse_pas_le_moteur():
         "modele": None,
         "probabilite_defaut": None,
         "anomalies": [],
+        "anomaly_score": None,
+        "anomaly_scope_excluded": False,
         "plafond_ml": None,
     }
 
@@ -116,7 +120,23 @@ def test_anomalie_documentaire_explique_un_revenu_trop_eleve():
     suspicious = detect(trap, artifact=artifact)
     assert suspicious["anomaly_score"] > normal["anomaly_score"]
     assert suspicious["anomaly_score"] >= 0.8
-    assert any(item["feature"] == "revenus_sur_epargne" for item in suspicious["anomalies"])
+    assert any(item["feature"] == "log_revenus_sur_epargne" for item in suspicious["anomalies"])
+
+
+def test_thin_file_est_hors_du_scope_des_anomalies():
+    dossier = _dossier()
+    dossier["membre"]["anciennete_mois"] = 2
+    dossier["historique"].update(
+        {
+            "credits_passes": [],
+            "epargne_moy_3m": 30_000,
+            "epargne_moy_6m": 20_000,
+            "nb_mouvements_90j": 1,
+        }
+    )
+    result = detect(dossier)
+    assert result["scope_excluded"] is True
+    assert result["anomalies"] == []
 
 
 def test_simulation_est_deterministe_et_le_choc_augmente_le_risque():
@@ -127,6 +147,21 @@ def test_simulation_est_deterministe_et_le_choc_augmente_le_risque():
     assert normal == replay
     assert shock["p_incident"] >= normal["p_incident"]
     assert len(shock["trajectoires"]["p50"]) == 12
+
+
+def test_simulation_produit_un_risque_intermediaire_sur_un_dossier_limite():
+    dossier = _dossier()
+    dossier["analyse"]["tresorerie"] = [
+        {"mois": month, "flux_entrant": 260_000, "flux_sortant": 180_000}
+        for month in range(1, 13)
+    ]
+    result = simulate_resilience(
+        dossier,
+        scenario={"type": "choc", "intensite": -0.20},
+        trajectories=5_000,
+        seed=72,
+    )
+    assert 0 < result["p_incident"] < 1
 
 
 def test_contrefactuel_ne_leve_jamais_un_knockout():

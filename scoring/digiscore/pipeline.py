@@ -5,6 +5,8 @@ from digiscore.policy import (
     EXCEPTIONAL_AMOUNT_THRESHOLD,
     FISCAL_DOCUMENT_AMOUNT_THRESHOLD,
     RCSD_KNOCKOUT_THRESHOLD,
+    SCORE_ANALYSIS_MAX,
+    SCORE_REJECTION_MAX,
     select_knockout_message,
 )
 from digiscore.scorecard import compute_score
@@ -12,9 +14,9 @@ from digiscore.types import DossierInput, ScoreResult
 
 
 def _zone(score: float) -> str:
-    if score <= 40:
+    if score <= SCORE_REJECTION_MAX:
         return "rejet"
-    if score <= 70:
+    if score <= SCORE_ANALYSIS_MAX:
         return "analyse"
     return "approbation"
 
@@ -96,9 +98,11 @@ def run(dossier: dict | DossierInput) -> ScoreResult:
     if fin["mois_critique"]:
         expl.append(f"Creux de tresorerie au mois {fin['mois_critique']}")
 
-    eligible = code in ("MONTANT_OK", "UPSELL_POSSIBLE", "VOIE_EXCEPTIONNELLE", "MONTANT_PLAFONNE") and not knockouts
-    if code == "MONTANT_PLAFONNE" and not knockouts:
-        eligible = True
+    eligible = (
+        code in ("MONTANT_OK", "UPSELL_POSSIBLE", "VOIE_EXCEPTIONNELLE", "MONTANT_PLAFONNE")
+        and not knockouts
+        and eligible_amt > 0
+    )
 
     return ScoreResult(
         eligible=eligible,
