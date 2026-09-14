@@ -72,6 +72,15 @@ def test_decision_unknown_avis_400():
     assert r.status_code == 400
 
 
+def test_decision_alias_normalises_sans_db():
+    from app.api.routes import normaliser_decision
+
+    assert normaliser_decision("chef_agence", "approuver") == ("chef_agence", "accorder")
+    assert normaliser_decision("chef", "accorder") == ("chef_agence", "accorder")
+    assert normaliser_decision("cic", "rejeter") == ("cic", "refuser")
+    assert normaliser_decision("cic", " Approuver ") == ("cic", "accorder")
+
+
 def test_referentiels_agences_institutions_moi():
     token = _token("agent")
     h = {"Authorization": f"Bearer {token}"}
