@@ -94,6 +94,52 @@ def test_thin_file():
     assert r.message_code in ("HISTORIQUE_INSUFFISANT", "MONTANT_PLAFONNE")
 
 
+def test_mem004_reste_un_thin_file_et_est_bloque_par_le_rcsd():
+    """Regression test du dossier seed exact MEM-004 / demande 004."""
+    r = run(
+        {
+            "membre": {"id": 4, "anciennete_mois": 2, "statut": "actif"},
+            "compte": {"solde": 35000, "date_ouverture_jours": 60, "statut": "actif"},
+            "historique": {
+                "credits_passes": [],
+                "incidents": [],
+                "epargne_moy_3m": 30000,
+                "epargne_moy_6m": 20000,
+                "nb_mouvements_90j": 1,
+            },
+            "demande": {"montant": 400000, "duree_mois": 8, "situation_fiscale": "non_fourni"},
+            "analyse": {
+                "ca": 900000,
+                "cmv": 500000,
+                "charges_exploitation": 200000,
+                "revenu_perso": 60000,
+                "charge_familiale": 30000,
+                "fonds_propres": 50000,
+                "total_dettes": 80000,
+                "actif_total": 200000,
+                "actif_circulant": 80000,
+                "passif_circulant": 60000,
+                "stock_moyen": 40000,
+                "resultat_net": 40000,
+                "preuve_revenu": "N1",
+                "preuve_charge": "N1",
+                "patrimoine": {
+                    "actifs_productifs": 80000,
+                    "actifs_non_productifs": 20000,
+                    "passifs_formels": 40000,
+                    "passifs_informels": 20000,
+                },
+            },
+        }
+    )
+    assert r.thin_file is True
+    assert r.financials["rcsd"] < 1
+    assert r.message_code == "KNOCKOUT_RCSD"
+    assert r.zone == "rejet"
+    assert r.montant_eligible == 0
+    assert 0 <= r.score_global <= 100
+
+
 def test_compte_gele():
     r = run(_base(membre={"id": 10, "anciennete_mois": 70, "statut": "gele"}))
     assert r.message_code == "COMPTE_INACTIF"

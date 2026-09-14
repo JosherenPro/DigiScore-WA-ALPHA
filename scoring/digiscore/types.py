@@ -102,7 +102,7 @@ class DossierInput(BaseModel):
 
 class CritereOut(BaseModel):
     code: str
-    note: float
+    note: float = Field(ge=0, le=100)
     poids: float
     contribution: float
 
@@ -115,7 +115,8 @@ class KnockoutOut(BaseModel):
 class ScoreResult(BaseModel):
     eligible: bool
     thin_file: bool
-    score_global: float
+    # Contrat public DigiScore : le score est toujours exprime sur 100.
+    score_global: float = Field(ge=0, le=100)
     criteres: list[CritereOut]
     knockouts: list[KnockoutOut]
     montant_demande: float
