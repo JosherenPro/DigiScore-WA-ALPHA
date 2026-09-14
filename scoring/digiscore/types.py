@@ -34,6 +34,10 @@ class HistoriqueIn(BaseModel):
     nb_mouvements_90j: int = Field(default=0, ge=0)
     credits_ailleurs: bool = False
     preuves_externes_ok: bool = False
+    # v3 — nouvelles variables issues des tables historisees / externes (defaut 0 = compatible v2).
+    ext_epargne_6m: float = Field(default=0, ge=0)
+    ext_nb_mouvements_90j: int = Field(default=0, ge=0)
+    bic_incidents: int = Field(default=0, ge=0)
 
 
 class DemandeIn(BaseModel):
@@ -88,6 +92,9 @@ class AnalyseIn(BaseModel):
     preuve_charge: str = "N1"
     saisonnier: bool = False
     dependance_debouche: bool = False
+    # v3 — marche / activite issus de market + activity (defaut 0 = compatible v2).
+    concurrence: int = Field(default=0, ge=0)
+    anciennete_activite_mois: int = Field(default=12, ge=0)
     tresorerie: list[TresorerieMois] = Field(default_factory=list)
     patrimoine: PatrimoineIn = Field(default_factory=PatrimoineIn)
 

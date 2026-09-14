@@ -1,0 +1,45 @@
+{
+  "model_version": "scorecard-v3",
+  "seed": 72,
+  "rows": 20011,
+  "default_rate": 0.024487,
+  "auc": 1.0,
+  "brier_score": 4.6e-05,
+  "label": "par30_futur_outstanding_impaye_j30+_seul",
+  "source": "postgres_volume_v2_point_in_time",
+  "warning": "Volume synthetique deterministe (profil late -> past_impaye + PAR30 lies) : AUC proche de 1. Pipeline technique OK, pas un risque reel. Shadow/demo uniquement; production = historiques FUCEC reels.",
+  "calibration": [
+    {
+      "mean_predicted": 0.0,
+      "fraction_positive": 0.0
+    },
+    {
+      "mean_predicted": 0.0,
+      "fraction_positive": 0.0
+    },
+    {
+      "mean_predicted": 0.0,
+      "fraction_positive": 0.0
+    },
+    {
+      "mean_predicted": 0.0,
+      "fraction_positive": 0.0
+    },
+    {
+      "mean_predicted": 0.0,
+      "fraction_positive": 0.0
+    },
+    {
+      "mean_predicted": 0.0,
+      "fraction_positive": 0.0
+    },
+    {
+      "mean_predicted": 4.7e-05,
+      "fraction_positive": 0.0
+    },
+    {
+      "mean_predicted": 0.196104,
+      "fraction_positive": 0.196486
+    }
+  ]
+}

@@ -29,8 +29,8 @@ class DemandeCreate(BaseModel):
     membre_id: int
     produit_id: int = 1
     objet: str
-    montant_demande: float
-    duree_mois: int = 12
+    montant_demande: float = Field(gt=0, le=100_000_000)
+    duree_mois: int = Field(default=12, ge=1, le=60)
     agent_id: int = 1
     situation_fiscale: str = "non_fourni"
     credits_ailleurs: bool = False
@@ -249,17 +249,27 @@ class MemoOut(BaseModel):
 class AmortissementOut(BaseModel):
     montant: float
     duree_mois: int
+    taux_nominal: float = 0.018
+    taux_assurance: float = 0.12
+    mensualite_hors_assurance: float = 0
+    assurance_mensuelle: float = 0
+    mensualite_totale: float = 0
+    cout_total: float = 0
     lignes: list[dict]
 
 
 class ParOut(BaseModel):
     agence_id: int | None = None
+    par1: float | None = None
     par30: float
     par90: float
+    encours_brut: float | None = None
+    label: str | None = None
 
 
 class VisionPortefeuilleOut(BaseModel):
     module: str
+    as_of: str | None = None
     par: list[ParOut]
     alertes: list[dict]
 
@@ -329,3 +339,36 @@ class PageMouvements(BaseModel):
     page: int
     page_size: int
     total: int
+
+
+class MlScorecardOut(BaseModel):
+    score_global_ml: float | None = None
+    probabilite_defaut: float | None = None
+    modele_version: str | None = None
+    modele_type: str | None = None
+    top_factors: list[dict] = Field(default_factory=list)
+    contributions: list[dict] = Field(default_factory=list)
+
+
+class MlAnomalyOut(BaseModel):
+    enabled: bool = False
+    scope_excluded: bool = False
+    anomaly_score: float | None = None
+    anomalies: list[dict] = Field(default_factory=list)
+    model_version: str | None = None
+
+
+class MlAssistanceOut(BaseModel):
+    model_version: str | None = None
+    mode: str = "shadow"
+    scorecard: MlScorecardOut | None = None
+    anomalies: MlAnomalyOut | None = None
+    plafond_ml: dict | None = None
+    warning: str | None = None
+
+
+class SimulationIn(BaseModel):
+    scenario: dict | str | None = None
+    montant: float | None = None
+    duree_mois: int | None = None
+    seed: int = 72

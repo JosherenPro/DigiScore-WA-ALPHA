@@ -13,6 +13,9 @@ services:
       - ./backend/db/seed/02_metier.sql:/docker-entrypoint-initdb.d/02_metier.sql:ro
       - ./backend/db/seed/03_auth_alter.sql:/docker-entrypoint-initdb.d/03_auth_alter.sql:ro
       - ./backend/db/seed/04_data_alter.sql:/docker-entrypoint-initdb.d/04_data_alter.sql:ro
+      - ./backend/db/seed/05_ml_alter.sql:/docker-entrypoint-initdb.d/05_ml_alter.sql:ro
+      - ./backend/db/seed/06_m6_alter.sql:/docker-entrypoint-initdb.d/06_m6_alter.sql:ro
+      - ./backend/db/seed/06_assurance_alter.sql:/docker-entrypoint-initdb.d/06_assurance_alter.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U digiscore"]
       interval: 5s

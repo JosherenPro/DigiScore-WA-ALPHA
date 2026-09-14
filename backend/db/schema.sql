@@ -521,9 +521,11 @@ CREATE TABLE amortization_line (
     installment_amount  NUMERIC(14, 0) NOT NULL,
     principal           NUMERIC(14, 0) NOT NULL,
     interest_amount     NUMERIC(14, 0) NOT NULL,
-    remaining_principal NUMERIC(14, 0) NOT NULL
+    remaining_principal NUMERIC(14, 0) NOT NULL,
+    due_on              DATE
 );
 COMMENT ON TABLE amortization_line IS 'Tableau d''amortissement calcule sur le montant retenu (eligible).';
+COMMENT ON COLUMN amortization_line.due_on IS 'Date d''echeance (M6 : retard, echeances du jour).';
 
 CREATE TABLE decision (
     id              SERIAL PRIMARY KEY,
@@ -577,49 +579,106 @@ CREATE TABLE outstanding_loan (
                     CHECK (status IN ('en_cours', 'solde', 'impaye')),
     disbursed_on    DATE,
     due_on          DATE,
-    observed_on     DATE
+    observed_on     DATE,
+    restructured    BOOLEAN NOT NULL DEFAULT FALSE
 );
 COMMENT ON TABLE outstanding_loan IS 'Credits decaisses (PAR). Structure M6, moteur live = OUT 72h.';
 COMMENT ON COLUMN outstanding_loan.disbursed_on IS 'Date de decaissement (cible PAR constructible).';
+COMMENT ON COLUMN outstanding_loan.restructured IS 'Credit restructure : compte au numerateur PAR (FUCEC).';
 
 CREATE INDEX idx_loan_member ON outstanding_loan (member_id);
+CREATE INDEX idx_loan_late ON outstanding_loan (days_late DESC);
+
+CREATE TABLE loan_payment (
+    id                   SERIAL PRIMARY KEY,
+    outstanding_loan_id  INT NOT NULL REFERENCES outstanding_loan (id) ON DELETE CASCADE,
+    paid_on              DATE NOT NULL,
+    amount               NUMERIC(14, 0) NOT NULL,
+    kind                 VARCHAR(20) NOT NULL DEFAULT 'echeance'
+                         CHECK (kind IN ('echeance', 'anticipe', 'reechelonnement')),
+    external_ref         VARCHAR(60)
+);
+COMMENT ON TABLE loan_payment IS 'Paiements recus (import core banking / saisie) : retard FIFO + taux de recuperation.';
+
+CREATE INDEX idx_loan_payment_loan ON loan_payment (outstanding_loan_id, paid_on);
 
 CREATE TABLE portfolio_followup (
-    id          SERIAL PRIMARY KEY,
-    member_id   INT NOT NULL REFERENCES member (id),
-    visit_code  VARCHAR(4) CHECK (visit_code IN ('V1', 'V2', 'V3')),
-    visit_on    DATE,
-    officer_id  INT REFERENCES app_user (id),
-    days_late   INT NOT NULL DEFAULT 0,
-    signal      VARCHAR(80)
+    id           SERIAL PRIMARY KEY,
+    member_id    INT NOT NULL REFERENCES member (id),
+    visit_code   VARCHAR(4) CHECK (visit_code IN ('V1', 'V2', 'V3')),
+    visit_on     DATE,
+    officer_id   INT REFERENCES app_user (id),
+    days_late    INT NOT NULL DEFAULT 0,
+    signal       VARCHAR(80),
+    signal_code  VARCHAR(40),
+    visit_status VARCHAR(20) NOT NULL DEFAULT 'realisee'
+                 CHECK (visit_status IN ('planifiee', 'realisee', 'manquee')),
+    next_on      DATE,
+    action_taken VARCHAR(160)
 );
 COMMENT ON TABLE portfolio_followup IS 'Visites V1-V3 et signaux d''alerte portefeuille (12 types FUCEC).';
 
 CREATE TABLE par_indicator (
-    id          SERIAL PRIMARY KEY,
-    agency_id   INT REFERENCES agency (id),
-    as_of       DATE NOT NULL DEFAULT DATE '2026-09-13',
-    par30_pct   NUMERIC(6, 2) NOT NULL DEFAULT 0,
-    par90_pct   NUMERIC(6, 2) NOT NULL DEFAULT 0
+    id                   SERIAL PRIMARY KEY,
+    agency_id            INT REFERENCES agency (id),
+    as_of                DATE NOT NULL DEFAULT DATE '2026-09-13',
+    par1_pct             NUMERIC(6, 2) NOT NULL DEFAULT 0,
+    par30_pct            NUMERIC(6, 2) NOT NULL DEFAULT 0,
+    par90_pct            NUMERIC(6, 2) NOT NULL DEFAULT 0,
+    encours_brut         NUMERIC(16, 0) NOT NULL DEFAULT 0,
+    restructured_amount  NUMERIC(16, 0) NOT NULL DEFAULT 0,
+    computed_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-COMMENT ON TABLE par_indicator IS 'PAR 30 / PAR 90 par agence (chiffres seed en maquette).';
+COMMENT ON TABLE par_indicator IS 'Snapshot PAR 1 / 30 / 90 par agence (calcule ou seed en maquette).';
 
 CREATE TABLE recovery_case (
-    id          SERIAL PRIMARY KEY,
-    member_id   INT NOT NULL REFERENCES member (id),
-    level       INT NOT NULL CHECK (level BETWEEN 1 AND 4),
-    action      VARCHAR(120),
-    owner_name  VARCHAR(80),
-    opened_on   DATE,
-    next_on     DATE
+    id                SERIAL PRIMARY KEY,
+    member_id         INT NOT NULL REFERENCES member (id),
+    level             INT NOT NULL CHECK (level BETWEEN 1 AND 4),
+    action            VARCHAR(120),
+    owner_name        VARCHAR(80),
+    opened_on         DATE,
+    next_on           DATE,
+    priority          VARCHAR(4),
+    status            VARCHAR(20) NOT NULL DEFAULT 'ouvert'
+                      CHECK (status IN ('ouvert', 'clos')),
+    recovered_amount  NUMERIC(14, 0) NOT NULL DEFAULT 0,
+    last_action_on    DATE,
+    closed_on         DATE
 );
 COMMENT ON TABLE recovery_case IS 'Dossier recouvrement 4 niveaux (relance ? contentieux).';
 
 CREATE TABLE recovery_action (
-    id          SERIAL PRIMARY KEY,
-    case_id     INT NOT NULL REFERENCES recovery_case (id) ON DELETE CASCADE,
-    action_on   DATE NOT NULL,
-    action_type VARCHAR(60) NOT NULL,
-    note        TEXT
+    id                SERIAL PRIMARY KEY,
+    case_id           INT NOT NULL REFERENCES recovery_case (id) ON DELETE CASCADE,
+    action_on         DATE NOT NULL,
+    action_type       VARCHAR(60) NOT NULL,
+    note              TEXT,
+    promise_on        DATE,
+    promise_kept      BOOLEAN,
+    amount_recovered  NUMERIC(14, 0) NOT NULL DEFAULT 0
 );
 COMMENT ON TABLE recovery_action IS 'Journal d''actions de recouvrement (M7).';
+
+-- ---------------------------------------------------------------------------
+-- ML consultatif (additif) — GUIDE_ML_BACKEND_DATA.md
+-- ---------------------------------------------------------------------------
+CREATE TABLE resilience_simulation (
+    id                    SERIAL PRIMARY KEY,
+    application_id        INT NOT NULL REFERENCES credit_application (id) ON DELETE CASCADE,
+    scenario              VARCHAR(60) NOT NULL,
+    requested_amount      NUMERIC(14, 0) NOT NULL,
+    term_months           INT NOT NULL,
+    horizon_months        INT NOT NULL,
+    iterations            INT NOT NULL,
+    random_seed           INT NOT NULL,
+    model_version         VARCHAR(40) NOT NULL,
+    incident_probability  NUMERIC(6, 5) NOT NULL,
+    critical_month        INT,
+    result_json           JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_by            INT REFERENCES app_user (id),
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+COMMENT ON TABLE resilience_simulation IS 'Snapshots de simulation de resilience rejouables (seed + result_json).';
+
+CREATE INDEX idx_resilience_application ON resilience_simulation (application_id, created_at DESC);

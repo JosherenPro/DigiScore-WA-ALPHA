@@ -1,5 +1,4 @@
-import os
-from datetime import date
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import delete, exists, func, or_, select
@@ -42,7 +41,6 @@ from app.models.tables import (
     MemberGuarantee,
     MonthlyCashflow,
     OutstandingLoan,
-    ParIndicator,
     PastCredit,
     PortfolioFollowup,
     RecoveryAction,
@@ -77,9 +75,8 @@ from app.schemas.dossier import (
     ReferentielsOut,
     SoumettreOut,
     TokenOut,
-    VisionPortefeuilleOut,
-    VisionRecouvrementOut,
 )
+from app.services.capabilities_service import capabilities as ml_capabilities
 from app.services.amortissement import generer
 from app.services.dossier_builder import build_dossier
 from app.services.workflow import can_chef_close, next_queue
@@ -90,6 +87,17 @@ router = APIRouter()
 
 ENGINE_VERSION = "rules-v1"
 AVIS_OK = frozenset({"renvoyer", "escalader", "accorder", "valider", "conditionner", "refuser"})
+# Alias toleres cote front, normalises vers les valeurs canoniques avant
+# validation et persistence (le front envoie "approuver", le metier dit "accorder").
+AVIS_ALIAS = {"approuver": "accorder", "rejeter": "refuser"}
+NIVEAU_ALIAS = {"chef": "chef_agence"}
+
+
+def normaliser_decision(niveau: str, avis: str) -> tuple[str, str]:
+    """Normalise niveau/avis vers les valeurs canoniques (insensible a la casse)."""
+    niveau_norm = NIVEAU_ALIAS.get((niveau or "").strip().lower(), (niveau or "").strip())
+    avis_norm = AVIS_ALIAS.get((avis or "").strip().lower(), (avis or "").strip().lower())
+    return niveau_norm, avis_norm
 
 
 def _clamp_page(page: int, page_size: int) -> tuple[int, int, int]:
@@ -114,15 +122,8 @@ def _user_out(u: AppUser) -> dict:
 
 @router.get("/capabilities", tags=["sante"], response_model=CapabilitiesOut)
 def capabilities():
-    """Stub : ML masqué. Le moteur règles reste la seule décision exposée."""
-    enabled = os.getenv("ML_ENABLED", "0") == "1"
-    return {
-        "ml_scorecard": False,
-        "anomalies": False,
-        "simulation": False,
-        "early_warning": False,
-        "model_version": "joblib-synth" if enabled else None,
-    }
+    """Capacités ML consultatives, masquées par défaut (ML_ENABLED=0)."""
+    return ml_capabilities()
 
 
 @router.get("/agences", tags=["referentiel"], response_model=list[AgenceOut])
@@ -907,7 +908,7 @@ def _archive_score(db: Session, existing: ScoreResult) -> None:
             knockouts=existing.knockouts,
             explanation=existing.explanation,
             engine_version=existing.engine_version or ENGINE_VERSION,
-            scored_at=existing.created_at,
+            scored_at=existing.created_at or datetime.now(timezone.utc),
         )
     )
 
@@ -928,7 +929,7 @@ def _archive_ratio(db: Session, ratio: FinancialRatio) -> None:
             net_worth=ratio.net_worth,
             weak_ratio_count=ratio.weak_ratio_count,
             stress_month=ratio.stress_month,
-            computed_at=ratio.computed_at,
+            computed_at=ratio.computed_at or datetime.now(timezone.utc),
         )
     )
 
@@ -955,6 +956,7 @@ def analyser(demande_id: int, user: StaffUser, db: Session = Depends(get_db)):
         knockouts=[k.model_dump() for k in result.knockouts],
         explanation=result.explication,
         engine_version=ENGINE_VERSION,
+        created_at=datetime.now(timezone.utc),
     )
     if existing:
         _archive_score(db, existing)
@@ -979,6 +981,7 @@ def analyser(demande_id: int, user: StaffUser, db: Session = Depends(get_db)):
         net_worth=fin.get("situation_nette"),
         weak_ratio_count=fin.get("nb_ratios_degrades"),
         stress_month=fin.get("mois_critique"),
+        computed_at=datetime.now(timezone.utc),
     )
     if ratio:
         _archive_ratio(db, ratio)
@@ -1008,6 +1011,7 @@ def soumettre(demande_id: int, user: AgentUser, db: Session = Depends(get_db)):
             application_id=demande_id,
             level="agent",
             opinion="soumettre",
+            is_override=False,
             user_id=user.id,
         )
     )
@@ -1028,13 +1032,14 @@ def decision(demande_id: int, body: DecisionIn, user: ReviewerUser, db: Session 
     app = db.get(CreditApplication, demande_id)
     if not app:
         raise HTTPException(404)
-    if body.avis not in AVIS_OK:
-        raise HTTPException(400, f"Avis inconnu : {body.avis}")
-    if body.niveau == "chef_agence" and user.role != "chef_agence":
+    niveau, avis = normaliser_decision(body.niveau, body.avis)
+    if avis not in AVIS_OK:
+        raise HTTPException(400, f"Avis inconnu : {body.avis} (attendus : {', '.join(sorted(AVIS_OK))})")
+    if niveau == "chef_agence" and user.role != "chef_agence":
         raise HTTPException(403, "Seul le chef d'agence peut signer a ce niveau")
-    if body.niveau == "cic" and user.role != "cic":
+    if niveau == "cic" and user.role != "cic":
         raise HTTPException(403, "Seul le CIC peut signer a ce niveau")
-    if body.niveau not in ("chef_agence", "cic"):
+    if niveau not in ("chef_agence", "cic"):
         raise HTTPException(400, "niveau doit etre chef_agence ou cic")
     sc = db.scalars(select(ScoreResult).where(ScoreResult.application_id == demande_id)).first()
     zone = "approbation"
@@ -1042,40 +1047,40 @@ def decision(demande_id: int, body: DecisionIn, user: ReviewerUser, db: Session 
         zone = _zone_score(float(sc.score_total)) or "approbation"
     reco = "accorder" if zone == "approbation" else ("refuser" if zone == "rejet" else "escalader")
     override = body.override or (
-        body.avis not in (reco, "renvoyer", "escalader", "soumettre", "valider", "conditionner")
+        avis not in (reco, "renvoyer", "escalader", "soumettre", "valider", "conditionner")
     )
     if override and not body.motif:
         raise HTTPException(400, "Motif obligatoire en cas d'ecart a la recommandation")
     db.add(
         Decision(
             application_id=demande_id,
-            level=body.niveau,
-            opinion=body.avis,
+            level=niveau,
+            opinion=avis,
             reason=body.motif,
             is_override=override,
             user_id=user.id,
         )
     )
-    if body.avis == "renvoyer":
+    if avis == "renvoyer":
         app.status = "renvoye"
-    elif body.avis == "escalader":
+    elif avis == "escalader":
         app.status = "soumis_cic"
-    elif body.avis in ("accorder", "valider"):
-        if body.niveau == "chef_agence" and sc and not can_chef_close(
+    elif avis in ("accorder", "valider"):
+        if niveau == "chef_agence" and sc and not can_chef_close(
             zone, sc.message_code, float(app.requested_amount)
         ):
             app.status = "soumis_cic"
         else:
             app.status = "accorde"
-    elif body.avis == "conditionner":
+    elif avis == "conditionner":
         app.status = "conditionne"
-    elif body.avis == "refuser":
+    elif avis == "refuser":
         app.status = "refuse"
     db.add(
         AuditLog(
             application_id=demande_id,
             user_id=user.id,
-            action=body.avis,
+            action=avis,
             detail=body.motif,
         )
     )
@@ -1107,27 +1112,65 @@ def memo(demande_id: int, user: StaffUser, db: Session = Depends(get_db)):
 
 
 @router.get("/demandes/{demande_id}/amortissement", tags=["workflow"], response_model=AmortissementOut)
-def amortissement(demande_id: int, _user: StaffUser, db: Session = Depends(get_db)):
+def amortissement(
+    demande_id: int,
+    _user: StaffUser,
+    montant: float | None = Query(default=None, ge=0, description="Capital (B5). Defaut : montant eligible sinon demande."),
+    duree_mois: int | None = Query(default=None, ge=1, le=60, description="Duree en mois (B6). Defaut : duree de la demande."),
+    taux_nominal: float | None = Query(default=None, ge=0, description="Taux nominal annuel decimal (B7). Defaut : taux produit."),
+    taux_assurance: float = Query(default=0.12, ge=0, description="Taux d'assurance annuel decimal (B8). Defaut 12 %."),
+    db: Session = Depends(get_db),
+):
+    """Tableau d'amortissement actuariel + assurance (M5, affichage seul).
+
+    Sans `montant`/`duree_mois`, le tableau est calcule sur le dossier et
+    persiste (1 ligne/mois). Avec overrides (lignes Simulations), il est
+    calcule a la volee sans ecrire en base.
+    """
     app = db.get(CreditApplication, demande_id)
     if not app:
         raise HTTPException(404)
-    sc = db.scalars(select(ScoreResult).where(ScoreResult.application_id == demande_id)).first()
-    montant = float(sc.eligible_amount) if sc else float(app.requested_amount)
-    rows = generer(montant, app.term_months)
-    db.execute(delete(AmortizationLine).where(AmortizationLine.application_id == demande_id))
-    for r in rows:
-        db.add(
-            AmortizationLine(
-                application_id=demande_id,
-                installment_no=r["numero"],
-                installment_amount=r["echeance"],
-                principal=r["capital"],
-                interest_amount=r["interet"],
-                remaining_principal=r["restant"],
+    simulation = montant is not None or duree_mois is not None
+    if montant is None:
+        sc = db.scalars(select(ScoreResult).where(ScoreResult.application_id == demande_id)).first()
+        montant = float(sc.eligible_amount) if sc else float(app.requested_amount)
+    if duree_mois is None:
+        duree_mois = app.term_months
+    if taux_nominal is None:
+        prod = db.get(CreditProduct, app.product_id)
+        taux_nominal = float(prod.indicative_rate) if prod and prod.indicative_rate is not None else 0.018
+    tableau = generer(montant, duree_mois, taux_nominal, taux_assurance)
+    rows = tableau["lignes"]
+    if not simulation:
+        db.execute(delete(AmortizationLine).where(AmortizationLine.application_id == demande_id))
+        today = date.today()
+        for r in rows:
+            month = today.month + r["numero"]
+            due = date(today.year + (month - 1) // 12, (month - 1) % 12 + 1, min(today.day, 28))
+            db.add(
+                AmortizationLine(
+                    application_id=demande_id,
+                    installment_no=r["numero"],
+                    installment_amount=r["echeance_totale"],
+                    principal=r["capital"],
+                    interest_amount=r["interet"],
+                    insurance_amount=r["assurance"],
+                    remaining_principal=r["restant"],
+                    due_on=due,
+                )
             )
-        )
-    db.commit()
-    return {"montant": montant, "duree_mois": app.term_months, "lignes": rows}
+        db.commit()
+    return {
+        "montant": montant,
+        "duree_mois": duree_mois,
+        "taux_nominal": taux_nominal,
+        "taux_assurance": taux_assurance,
+        "mensualite_hors_assurance": tableau["mensualite_hors_assurance"],
+        "assurance_mensuelle": tableau["assurance_mensuelle"],
+        "mensualite_totale": tableau["mensualite_totale"],
+        "cout_total": tableau["cout_total"],
+        "lignes": rows,
+    }
 
 
 @router.get("/files/chef", tags=["workflow"], response_model=PageDemandes)
@@ -1150,28 +1193,3 @@ def file_cic(
     db: Session = Depends(get_db),
 ):
     return list_demandes(_user, statut="soumis_cic", page=page, page_size=page_size, db=db)
-
-
-@router.get("/vision/portefeuille", tags=["vision"], response_model=VisionPortefeuilleOut)
-def vision_m6(_user: ReviewerUser, db: Session = Depends(get_db)):
-    pars = db.scalars(select(ParIndicator)).all()
-    return {
-        "module": "M6 maquette",
-        "par": [{"agence_id": p.agency_id, "par30": float(p.par30_pct), "par90": float(p.par90_pct)} for p in pars],
-        "alertes": [
-            {"signal": "Absence aux visites", "membre_id": 3},
-            {"signal": "Baisse de stock saisonniere", "membre_id": 6},
-        ],
-    }
-
-
-@router.get("/vision/recouvrement", tags=["vision"], response_model=VisionRecouvrementOut)
-def vision_m7(_user: ReviewerUser, db: Session = Depends(get_db)):
-    rows = db.scalars(select(RecoveryCase)).all()
-    return {
-        "module": "M7 maquette",
-        "dossiers": [
-            {"membre_id": r.member_id, "niveau": r.level, "action": r.action, "responsable": r.owner_name}
-            for r in rows
-        ],
-    }
