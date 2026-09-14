@@ -1032,9 +1032,9 @@ def decision(demande_id: int, body: DecisionIn, user: ReviewerUser, db: Session 
     app = db.get(CreditApplication, demande_id)
     if not app:
         raise HTTPException(404)
-    niveau, avis = normaliser_decision(body.niveau, body.avis)
+    niveau, avis = normaliser_decision(body.niveau.value, body.avis.value)
     if avis not in AVIS_OK:
-        raise HTTPException(400, f"Avis inconnu : {body.avis} (attendus : {', '.join(sorted(AVIS_OK))})")
+        raise HTTPException(400, f"Avis inconnu : {body.avis.value} (attendus : {', '.join(sorted(AVIS_OK))})")
     if niveau == "chef_agence" and user.role != "chef_agence":
         raise HTTPException(403, "Seul le chef d'agence peut signer a ce niveau")
     if niveau == "cic" and user.role != "cic":

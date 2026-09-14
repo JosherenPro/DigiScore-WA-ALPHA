@@ -64,12 +64,21 @@ def test_agent_can_lookup_paginated():
 
 def test_decision_unknown_avis_400():
     token = _token("chef")
+    # "nimp" n'existe pas dans l'enum AvisDecision -> 422 de validation Pydantic
+    # (avant memes les alias toleres ; la BDD n'est jamais atteinte).
     r = client.post(
         "/demandes/1/decision",
         headers={"Authorization": f"Bearer {token}"},
         json={"niveau": "chef_agence", "avis": "nimp"},
     )
-    assert r.status_code == 400
+    assert r.status_code == 422
+    # L'ancien alias tolere "approuver" reste accepte puis normalise en "accorder".
+    r2 = client.post(
+        "/demandes/1/decision",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"niveau": "chef_agence", "avis": "approuver"},
+    )
+    assert r2.status_code in (200, 400, 404)
 
 
 def test_decision_alias_normalises_sans_db():
@@ -79,6 +88,52 @@ def test_decision_alias_normalises_sans_db():
     assert normaliser_decision("chef", "accorder") == ("chef_agence", "accorder")
     assert normaliser_decision("cic", "rejeter") == ("cic", "refuser")
     assert normaliser_decision("cic", " Approuver ") == ("cic", "accorder")
+
+
+def test_situation_fiscale_invalide_rejetee_avant_bdd():
+    """a_jour n'existe pas dans credit_application_tax_status_check.
+
+    Avant le fix, la valeur passait jusqu'a l'INSERT -> IntegrityError -> 500
+    genrique "Erreur interne". Desormais l'enum Pydantic rejete en 422.
+    """
+    token = _token("agent")
+    r = client.post(
+        "/demandes",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "membre_id": 1,
+            "objet": "Test validation",
+            "montant_demande": 100000,
+            "situation_fiscale": "a_jour",
+        },
+    )
+    assert r.status_code == 422
+    valeurs = r.json()["detail"][0]["ctx"]["expected"]
+    assert "en_regle" in valeurs and "non_fourni" in valeurs
+
+    # Les valeurs canoniques restent acceptees.
+    for ok in ("en_regle", "a_verifier", "non_conforme", "non_fourni"):
+        r2 = client.post(
+            "/demandes",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "membre_id": 1,
+                "objet": "Test validation",
+                "montant_demande": 100000,
+                "situation_fiscale": ok,
+            },
+        )
+        assert r2.status_code == 200, (ok, r2.text)
+
+
+def test_piece_invalide_rejetee_avant_bdd():
+    token = _token("agent")
+    r = client.post(
+        "/demandes/1/pieces",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"type_piece": "PASSPORT", "qualite_ocr": "ok"},
+    )
+    assert r.status_code == 422
 
 
 def test_referentiels_agences_institutions_moi():

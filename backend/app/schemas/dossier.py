@@ -1,6 +1,79 @@
 """Contrats JSON Front ↔ Back (alignés scoring/SPEC.md)."""
 
-from pydantic import BaseModel, Field
+from enum import Enum
+from typing import Annotated
+
+from pydantic import BaseModel, BeforeValidator, Field
+
+# Alias toleres cote front, normalises vers les valeurs canoniques avant
+# validation (le front envoie "approuver", le metier dit "accorder").
+AVIS_ALIAS = {"approuver": "accorder", "rejeter": "refuser"}
+NIVEAU_ALIAS = {"chef": "chef_agence"}
+
+
+class SituationFiscale(str, Enum):
+    """Valeurs autorisees par la contrainte credit_application_tax_status_check."""
+
+    EN_REGLE = "en_regle"
+    A_VERIFIER = "a_verifier"
+    NON_CONFORME = "non_conforme"
+    NON_FOURNI = "non_fourni"
+
+
+class NiveauDecision(str, Enum):
+    """Valeurs autorisees par decision_level_check."""
+
+    AGENT = "agent"
+    CHEF_AGENCE = "chef_agence"
+    CIC = "cic"
+
+
+class AvisDecision(str, Enum):
+    """Valeurs autorisees par decision_opinion_check."""
+
+    SOUMETTRE = "soumettre"
+    VALIDER = "valider"
+    REFUSER = "refuser"
+    RENVOYER = "renvoyer"
+    ESCALADER = "escalader"
+    ACCORDER = "accorder"
+    CONDITIONNER = "conditionner"
+
+
+def _norm_avis(v: str) -> AvisDecision:
+    key = (v or "").strip().lower()
+    return AvisDecision(AVIS_ALIAS.get(key, key))
+
+
+def _norm_niveau(v: str) -> NiveauDecision:
+    key = (v or "").strip().lower()
+    return NiveauDecision(NIVEAU_ALIAS.get(key, key))
+
+
+AvisInput = Annotated[AvisDecision, BeforeValidator(_norm_avis)]
+NiveauInput = Annotated[NiveauDecision, BeforeValidator(_norm_niveau)]
+
+
+class TypePiece(str, Enum):
+    """Valeurs autorisées par supporting_document_document_type_check."""
+
+    BIC = "BIC"
+    FISCAL = "FISCAL"
+    RELEVE = "RELEVE"
+    CARNET = "CARNET"
+    ECHEANCIER = "ECHEANCIER"
+    ATTESTATION_SOLDE = "ATTESTATION_SOLDE"
+    CNI = "CNI"
+    AUTRE = "AUTRE"
+
+
+class QualiteOCR(str, Enum):
+    """Valeurs autorisées par supporting_document_ocr_quality_check."""
+
+    OK = "ok"
+    FLOU = "flou"
+    SOMBRE = "sombre"
+    COUPE = "coupe"
 
 
 class CollecteIn(BaseModel):
@@ -32,15 +105,15 @@ class DemandeCreate(BaseModel):
     montant_demande: float = Field(gt=0, le=100_000_000)
     duree_mois: int = Field(default=12, ge=1, le=60)
     agent_id: int = 1
-    situation_fiscale: str = "non_fourni"
+    situation_fiscale: SituationFiscale = SituationFiscale.NON_FOURNI
     credits_ailleurs: bool = False
     preuves_externes_ok: bool = False
     collecte: CollecteIn | None = None
 
 
 class DecisionIn(BaseModel):
-    niveau: str
-    avis: str
+    niveau: NiveauInput
+    avis: AvisInput
     motif: str | None = None
     override: bool = False
 
@@ -65,9 +138,9 @@ class TokenOut(BaseModel):
 
 
 class PieceIn(BaseModel):
-    type_piece: str
+    type_piece: TypePiece
     fichier: str = "upload/demo.jpg"
-    qualite_ocr: str = "ok"
+    qualite_ocr: QualiteOCR = QualiteOCR.OK
 
 
 class ProduitOut(BaseModel):
@@ -211,7 +284,7 @@ class DemandeDetail(BaseModel):
     montant_demande: float
     duree_mois: int
     statut: str
-    situation_fiscale: str
+    situation_fiscale: str | None = None
     membre: dict | None = None
     produit: dict | None = None
     score: ScoreBloc | None = None
