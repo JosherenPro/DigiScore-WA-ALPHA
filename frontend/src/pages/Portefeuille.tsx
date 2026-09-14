@@ -10,7 +10,7 @@ export default function Portefeuille() {
   return (
     <div className="page">
       <h1>Suivi portefeuille</h1>
-      <p className="lede">Maquette M6 — chiffres seed, pas de moteur PAR live.</p>
+      <p className="lede">PAR calculé depuis les encours (agence) — aging, alertes et niveaux de recouvrement.</p>
       <section className="block">
         <h2>PAR agence</h2>
         <table>

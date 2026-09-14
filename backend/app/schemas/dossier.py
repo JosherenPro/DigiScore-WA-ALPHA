@@ -29,8 +29,8 @@ class DemandeCreate(BaseModel):
     membre_id: int
     produit_id: int = 1
     objet: str
-    montant_demande: float
-    duree_mois: int = 12
+    montant_demande: float = Field(gt=0, le=100_000_000)
+    duree_mois: int = Field(default=12, ge=1, le=60)
     agent_id: int = 1
     situation_fiscale: str = "non_fourni"
     credits_ailleurs: bool = False
@@ -260,12 +260,16 @@ class AmortissementOut(BaseModel):
 
 class ParOut(BaseModel):
     agence_id: int | None = None
+    par1: float | None = None
     par30: float
     par90: float
+    encours_brut: float | None = None
+    label: str | None = None
 
 
 class VisionPortefeuilleOut(BaseModel):
     module: str
+    as_of: str | None = None
     par: list[ParOut]
     alertes: list[dict]
 

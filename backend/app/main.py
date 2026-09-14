@@ -12,6 +12,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.routes import router
 from app.api.routes_ml import router as ml_router
+from app.api.routes_portfolio import router as portfolio_router
 from app.db import ping_db
 from app.schemas.dossier import HealthOut
 
@@ -22,7 +23,7 @@ OPENAPI_TAGS = [
     {"name": "membres", "description": "Lookup paginé (code, nom, account_no) et fiche historique."},
     {"name": "demandes", "description": "Création, collecte A–E, pièces, liste paginée."},
     {"name": "workflow", "description": "Analyse, soumission, décision, mémo, files chef/CIC."},
-    {"name": "vision", "description": "Maquettes M6 portefeuille et M7 recouvrement."},
+    {"name": "vision", "description": "M6 suivi portefeuille (PAR, aging, visites) et M7 recouvrement."},
     {"name": "ml", "description": "Enrichissements consultatifs : anomalies, simulation, early warning."},
 ]
 
@@ -49,6 +50,7 @@ app.add_middleware(
 
 app.include_router(router)
 app.include_router(ml_router)
+app.include_router(portfolio_router)
 
 
 @app.exception_handler(Exception)

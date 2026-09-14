@@ -41,7 +41,6 @@ from app.models.tables import (
     MemberGuarantee,
     MonthlyCashflow,
     OutstandingLoan,
-    ParIndicator,
     PastCredit,
     PortfolioFollowup,
     RecoveryAction,
@@ -76,8 +75,6 @@ from app.schemas.dossier import (
     ReferentielsOut,
     SoumettreOut,
     TokenOut,
-    VisionPortefeuilleOut,
-    VisionRecouvrementOut,
 )
 from app.services.capabilities_service import capabilities as ml_capabilities
 from app.services.amortissement import generer
@@ -1146,7 +1143,10 @@ def amortissement(
     rows = tableau["lignes"]
     if not simulation:
         db.execute(delete(AmortizationLine).where(AmortizationLine.application_id == demande_id))
+        today = date.today()
         for r in rows:
+            month = today.month + r["numero"]
+            due = date(today.year + (month - 1) // 12, (month - 1) % 12 + 1, min(today.day, 28))
             db.add(
                 AmortizationLine(
                     application_id=demande_id,
@@ -1156,6 +1156,7 @@ def amortissement(
                     interest_amount=r["interet"],
                     insurance_amount=r["assurance"],
                     remaining_principal=r["restant"],
+                    due_on=due,
                 )
             )
         db.commit()
@@ -1192,28 +1193,3 @@ def file_cic(
     db: Session = Depends(get_db),
 ):
     return list_demandes(_user, statut="soumis_cic", page=page, page_size=page_size, db=db)
-
-
-@router.get("/vision/portefeuille", tags=["vision"], response_model=VisionPortefeuilleOut)
-def vision_m6(_user: ReviewerUser, db: Session = Depends(get_db)):
-    pars = db.scalars(select(ParIndicator)).all()
-    return {
-        "module": "M6 maquette",
-        "par": [{"agence_id": p.agency_id, "par30": float(p.par30_pct), "par90": float(p.par90_pct)} for p in pars],
-        "alertes": [
-            {"signal": "Absence aux visites", "membre_id": 3},
-            {"signal": "Baisse de stock saisonniere", "membre_id": 6},
-        ],
-    }
-
-
-@router.get("/vision/recouvrement", tags=["vision"], response_model=VisionRecouvrementOut)
-def vision_m7(_user: ReviewerUser, db: Session = Depends(get_db)):
-    rows = db.scalars(select(RecoveryCase)).all()
-    return {
-        "module": "M7 maquette",
-        "dossiers": [
-            {"membre_id": r.member_id, "niveau": r.level, "action": r.action, "responsable": r.owner_name}
-            for r in rows
-        ],
-    }

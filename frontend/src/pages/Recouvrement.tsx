@@ -10,7 +10,7 @@ export default function Recouvrement() {
   return (
     <div className="page">
       <h1>Recouvrement</h1>
-      <p className="lede">Maquette M7 — 4 niveaux, données d’exemple.</p>
+      <p className="lede">4 niveaux de recouvrement — dossiers et journal d'actions.</p>
       <table>
         <thead>
           <tr>

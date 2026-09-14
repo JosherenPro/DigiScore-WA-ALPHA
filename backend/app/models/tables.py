@@ -297,10 +297,10 @@ class Activity(Base):
     application_id = mapped_column(Integer)
     activity_type = mapped_column(String)
     description = mapped_column(Text)
-    seniority_months = mapped_column(Integer)
+    seniority_months = mapped_column(Integer, default=12)
     location_area = mapped_column(String)
-    is_seasonal = mapped_column(Boolean)
-    proof_level = mapped_column(String)
+    is_seasonal = mapped_column(Boolean, default=False)
+    proof_level = mapped_column(String, default="N1")
 
 
 class ApplicationGuarantee(Base):
@@ -439,6 +439,7 @@ class AmortizationLine(Base):
     interest_amount = mapped_column(Numeric)
     insurance_amount = mapped_column(Numeric)
     remaining_principal = mapped_column(Numeric)
+    due_on = mapped_column(Date)
 
 
 class ParIndicator(Base):
@@ -446,8 +447,16 @@ class ParIndicator(Base):
     id = mapped_column(Integer, primary_key=True)
     agency_id = mapped_column(Integer)
     as_of = mapped_column(Date)
+    par1_pct = mapped_column(Numeric)
     par30_pct = mapped_column(Numeric)
     par90_pct = mapped_column(Numeric)
+    encours_brut = mapped_column(Numeric)
+    restructured_amount = mapped_column(Numeric)
+    computed_at = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        server_default=func.now(),
+    )
 
 
 class OutstandingLoan(Base):
@@ -462,6 +471,17 @@ class OutstandingLoan(Base):
     disbursed_on = mapped_column(Date)
     due_on = mapped_column(Date)
     observed_on = mapped_column(Date)
+    restructured = mapped_column(Boolean)
+
+
+class LoanPayment(Base):
+    __tablename__ = "loan_payment"
+    id = mapped_column(Integer, primary_key=True)
+    outstanding_loan_id = mapped_column(Integer)
+    paid_on = mapped_column(Date)
+    amount = mapped_column(Numeric)
+    kind = mapped_column(String)
+    external_ref = mapped_column(String)
 
 
 class PortfolioFollowup(Base):
@@ -470,8 +490,13 @@ class PortfolioFollowup(Base):
     member_id = mapped_column(Integer)
     visit_code = mapped_column(String)
     visit_on = mapped_column(Date)
+    officer_id = mapped_column(Integer)
     days_late = mapped_column(Integer)
     signal = mapped_column(String)
+    signal_code = mapped_column(String)
+    visit_status = mapped_column(String)
+    next_on = mapped_column(Date)
+    action_taken = mapped_column(String)
 
 
 class RecoveryCase(Base):
@@ -482,6 +507,12 @@ class RecoveryCase(Base):
     action = mapped_column(String)
     owner_name = mapped_column(String)
     opened_on = mapped_column(Date)
+    next_on = mapped_column(Date)
+    priority = mapped_column(String)
+    status = mapped_column(String)
+    recovered_amount = mapped_column(Numeric)
+    last_action_on = mapped_column(Date)
+    closed_on = mapped_column(Date)
 
 
 class RecoveryAction(Base):
@@ -491,6 +522,9 @@ class RecoveryAction(Base):
     action_on = mapped_column(Date)
     action_type = mapped_column(String)
     note = mapped_column(Text)
+    promise_on = mapped_column(Date)
+    promise_kept = mapped_column(Boolean)
+    amount_recovered = mapped_column(Numeric)
 
 
 class ResilienceSimulation(Base):
