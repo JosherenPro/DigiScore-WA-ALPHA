@@ -27,6 +27,20 @@ def _scenario_adjustments(scenario: dict[str, Any] | None) -> tuple[str, float, 
     return "normal", 0.0, 0.0
 
 
+def mecanique_scenario(scenario: dict[str, Any] | None) -> dict[str, float]:
+    """Facteurs multiplicatifs appliques par un scenario, en clair.
+
+    Expose la mecanique reelle (ex. ``{"revenus": 0.6, "charges": 1.1}``)
+    au lieu de laisser l'intensite comme un chiffre magique : un choc
+    ``-0.40`` reduit les revenus de 40 % **et** augmente les charges de 10 %.
+    """
+    kind, income_delta, expense_delta = _scenario_adjustments(scenario)
+    return {
+        "revenus": round(max(0.0, 1.0 + income_delta), 4),
+        "charges": round(max(0.0, 1.0 + expense_delta), 4),
+    }
+
+
 def _base_months(dossier: DossierInput, months: int):
     try:
         import numpy as np

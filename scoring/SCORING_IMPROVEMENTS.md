@@ -107,3 +107,23 @@ Les invariants à conserver sont :
 - une dette existante réduit la capacité RCSD ;
 - les frontières de zone `40/41/70/71` restent stables ;
 - une demande exceptionnelle est soumise à une décision humaine/CIC.
+
+## ML v3 — nouvelles variables et serving FastAPI
+
+`scorecard-v3` / `anomaly-v3` (`training/train_v3.py`, dataset
+`training/dataset_v3.csv` construit depuis Postgres point-in-time à
+`applied_at`, label `par30_futur` = `outstanding_loan` impayé J30+ seul).
+
+Nouvelles variables (défaut 0 = compatible v2) :
+`has_external`, `ext_epargne_6m/log`, `ext_nb_mouvements_90j`,
+`bic_incidents`, `past_impayes`, `max_jours_retard`, `preuves_score` (N1+N2+N3),
+`dependance_debouche`, `concurrence`, `signaux_patrimoine`.
+`dossier_builder` calcule désormais le vrai `COUNT` 90 j, le snapshot
+`as_of <= applied_at`, l'épargne externe et le BIC — plus de proxy `4/1`.
+
+Réserve : volume v2 synthétique déterministe (profil `late` ⇒ passé +
+PAR30 liés, `max_jours_retard` poids 0.69, AUC ≈ 1). Pipeline prouvé,
+pas un risque réel : **shadow/demo uniquement**, production = historiques
+FUCEC réels. Servies par `GET /demandes/{id}/ml/scorecard` et
+`/ml/plafond` (`routes_ml.py`, `ML_ENABLED=1`), sans toucher
+`eligible/zone/KO` ni `/analyser`.

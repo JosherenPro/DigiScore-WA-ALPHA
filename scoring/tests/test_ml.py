@@ -7,7 +7,7 @@ from digiscore.anomalies import detect, fit_anomaly
 from digiscore.counterfactual import suggest_counterfactuals
 from digiscore.credit_limit_ml import recommend_credit_limit
 from digiscore.ml import run_ml_assistance
-from digiscore.simulation import simulate_resilience
+from digiscore.simulation import mecanique_scenario, simulate_resilience
 from training.generate import generate_dataset
 from training.train_anomaly import generate_normal_rows
 
@@ -147,6 +147,18 @@ def test_simulation_est_deterministe_et_le_choc_augmente_le_risque():
     assert normal == replay
     assert shock["p_incident"] >= normal["p_incident"]
     assert len(shock["trajectoires"]["p50"]) == 12
+
+
+def test_mecanique_scenario_explicite_le_choc_reel():
+    assert mecanique_scenario({"type": "choc", "intensite": -0.40}) == {
+        "revenus": 0.6,
+        "charges": 1.1,
+    }
+    assert mecanique_scenario({"type": "inflation", "intensite": 0.15}) == {
+        "revenus": 1.0,
+        "charges": 1.15,
+    }
+    assert mecanique_scenario(None) == {"revenus": 1.0, "charges": 1.0}
 
 
 def test_simulation_produit_un_risque_intermediaire_sur_un_dossier_limite():
