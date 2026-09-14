@@ -1,8 +1,8 @@
 """Tableau d'amortissement actuariel avec assurance (M5).
 
 Conventions Excel (onglets Parametres / Simulations) :
-  B7  taux nominal annuel (decimal, ex. 0.018) -> t = B7 / 12
-  B8  taux d'assurance annuel (decimal, defaut 0.12 = 12 %)
+  B7  taux nominal annuel (decimal, defaut 0.14 = 14 %) -> t = B7 / 12
+  B8  taux d'assurance annuel (decimal, defaut 0.057 = 5,7 %)
   B11 mensualite hors assurance = K * t / (1 - (1 + t) ** -n)
   B12 cotisation assurance mensuelle = K * B8 / 12 (constante, assise sur le
       capital initial, pas sur le restant du)
@@ -15,7 +15,8 @@ un affichage M5, pas une entree du moteur de regles.
 
 from __future__ import annotations
 
-TAUX_ASSURANCE_DEFAUT = 0.12
+TAUX_NOMINAL_DEFAUT = 0.14
+TAUX_ASSURANCE_DEFAUT = 0.057
 
 
 def mensualite_hors_assurance(capital: float, duree: int, taux_annuel: float) -> int:
@@ -40,7 +41,7 @@ def cotisation_assurance(capital: float, taux_assurance: float = TAUX_ASSURANCE_
 def generer(
     montant: float,
     duree: int,
-    taux_annuel: float = 0.018,
+    taux_annuel: float = TAUX_NOMINAL_DEFAUT,
     taux_assurance: float = TAUX_ASSURANCE_DEFAUT,
 ) -> dict:
     """Construit le tableau + le resume B11/B12/B13/B14.

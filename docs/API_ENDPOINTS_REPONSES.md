@@ -1264,39 +1264,39 @@
 
 ### `GET /demandes/{id}/amortissement`
 
-**Tableau actuariel + assurance (12 %/an par défaut). Sans paramètres : calculé sur le montant éligible et persisté (1 ligne/mois). Avec `montant`/`duree_mois` : simulation à la volée, rien n'est écrit.**
+**Tableau actuariel + assurance (taux nominal 14 %, assurance 5,7 %/an par défaut). Sans paramètres : calculé sur le montant éligible et persisté (1 ligne/mois). Avec `montant`/`duree_mois` : simulation à la volée, rien n'est écrit.**
 
 - **Rôles** : agent / chef / cic
-- **Paramètres** : `montant` (≥0) · `duree_mois` (1–60) · `taux_nominal` (décimal annuel, défaut taux produit) · `taux_assurance` (défaut 0.12)
+- **Paramètres** : `montant` (≥0) · `duree_mois` (1–60) · `taux_nominal` (décimal annuel, défaut 0.14) · `taux_assurance` (défaut 0.057)
 - **Réponse `200`** :
 ```json
 {
   "montant": 870000.0,
   "duree_mois": 12,
-  "taux_nominal": 0.018,
-  "taux_assurance": 0.12,
-  "mensualite_hors_assurance": 73209.0,
-  "assurance_mensuelle": 8700.0,
-  "mensualite_totale": 81909.0,
-  "cout_total": 112906.0,
+  "taux_nominal": 0.14,
+  "taux_assurance": 0.057,
+  "mensualite_hors_assurance": 78115.0,
+  "assurance_mensuelle": 4132.0,
+  "mensualite_totale": 82247.0,
+  "cout_total": 116960.0,
   "lignes": [
     {
       "numero": 1,
-      "echeance": 73209,
-      "capital": 71904,
-      "interet": 1305,
-      "assurance": 8700,
-      "echeance_totale": 81909,
-      "restant": 798096.0
+      "echeance": 78115,
+      "capital": 67965,
+      "interet": 10150,
+      "assurance": 4132,
+      "echeance_totale": 82247,
+      "restant": 802035.0
     },
     {
       "numero": 2,
-      "echeance": 73209,
-      "capital": 72012,
-      "interet": 1197,
-      "assurance": 8700,
-      "echeance_totale": 81909,
-      "restant": 726084.0
+      "echeance": 78115,
+      "capital": 68758,
+      "interet": 9357,
+      "assurance": 4132,
+      "echeance_totale": 82247,
+      "restant": 733277.0
     },
     "... (10 autres elements - tronque pour lisibilite)"
   ]
@@ -1314,30 +1314,30 @@
 {
   "montant": 300000.0,
   "duree_mois": 6,
-  "taux_nominal": 0.018,
-  "taux_assurance": 0.12,
-  "mensualite_hors_assurance": 50263.0,
-  "assurance_mensuelle": 3000.0,
-  "mensualite_totale": 53263.0,
-  "cout_total": 19576.0,
+  "taux_nominal": 0.14,
+  "taux_assurance": 0.057,
+  "mensualite_hors_assurance": 52061.0,
+  "assurance_mensuelle": 1425.0,
+  "mensualite_totale": 53486.0,
+  "cout_total": 20917.0,
   "lignes": [
     {
       "numero": 1,
-      "echeance": 50263,
-      "capital": 49813,
-      "interet": 450,
-      "assurance": 3000,
-      "echeance_totale": 53263,
-      "restant": 250187.0
+      "echeance": 52061,
+      "capital": 48561,
+      "interet": 3500,
+      "assurance": 1425,
+      "echeance_totale": 53486,
+      "restant": 251439.0
     },
     {
       "numero": 2,
-      "echeance": 50263,
-      "capital": 49888,
-      "interet": 375,
-      "assurance": 3000,
-      "echeance_totale": 53263,
-      "restant": 200299.0
+      "echeance": 52061,
+      "capital": 49128,
+      "interet": 2933,
+      "assurance": 1425,
+      "echeance_totale": 53486,
+      "restant": 202311.0
     },
     "... (4 autres elements - tronque pour lisibilite)"
   ]

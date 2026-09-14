@@ -112,6 +112,26 @@ def test_plafond_ml_est_bloque_par_un_knockout():
     assert result["plafond_ml_recommande"] is None
 
 
+def test_plafond_ml_detail_decompose_chaque_etape():
+    result = recommend_credit_limit(
+        _dossier(),
+        default_probability=0.25,
+        facteurs=[{"feature": "max_jours_retard", "contribution": 1.5}],
+    )
+    detail = result["detail"]
+    assert detail["facteur_prudence"] == 0.75
+    assert detail["tranche_risque"].startswith("0,20 < p")
+    assert detail["decote_fcfa"] == round(detail["plafond_regles"] * 0.25, 2)
+    assert detail["avant_arrondi"] - detail["perte_arrondi_fcfa"] == result["plafond_ml_recommande"]
+    assert result["plafond_ml_recommande"] % 10_000 == 0
+    assert len(result["raisons"]) == 5
+    assert any("max_jours_retard" in r for r in result["raisons"])
+    if detail["couverture_demande"]:
+        assert "couvert" in result["raisons"][-1]
+    else:
+        assert "NON couvert" in result["raisons"][-1]
+
+
 def test_anomalie_documentaire_explique_un_revenu_trop_eleve():
     artifact = fit_anomaly(generate_normal_rows(3000, seed=72), seed=72)
     normal = detect(_dossier(), artifact=artifact)

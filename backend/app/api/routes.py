@@ -1117,8 +1117,8 @@ def amortissement(
     _user: StaffUser,
     montant: float | None = Query(default=None, ge=0, description="Capital (B5). Defaut : montant eligible sinon demande."),
     duree_mois: int | None = Query(default=None, ge=1, le=60, description="Duree en mois (B6). Defaut : duree de la demande."),
-    taux_nominal: float | None = Query(default=None, ge=0, description="Taux nominal annuel decimal (B7). Defaut : taux produit."),
-    taux_assurance: float = Query(default=0.12, ge=0, description="Taux d'assurance annuel decimal (B8). Defaut 12 %."),
+    taux_nominal: float = Query(default=0.14, ge=0, description="Taux nominal annuel decimal (B7). Defaut 14 %."),
+    taux_assurance: float = Query(default=0.057, ge=0, description="Taux d'assurance annuel decimal (B8). Defaut 5,7 %."),
     db: Session = Depends(get_db),
 ):
     """Tableau d'amortissement actuariel + assurance (M5, affichage seul).
@@ -1136,9 +1136,6 @@ def amortissement(
         montant = float(sc.eligible_amount) if sc else float(app.requested_amount)
     if duree_mois is None:
         duree_mois = app.term_months
-    if taux_nominal is None:
-        prod = db.get(CreditProduct, app.product_id)
-        taux_nominal = float(prod.indicative_rate) if prod and prod.indicative_rate is not None else 0.018
     tableau = generer(montant, duree_mois, taux_nominal, taux_assurance)
     rows = tableau["lignes"]
     if not simulation:

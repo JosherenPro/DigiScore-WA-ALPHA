@@ -229,6 +229,9 @@ def test_plafond_ml_shadow(monkeypatch):
         assert body["plafond_ml_recommande"] <= body["plafond_regles"]
         assert body["facteur_prudence"] in {1.0, 0.9, 0.75, 0.6}
         assert body["explication"]
+        assert body["detail"]["facteur_prudence"] == body["facteur_prudence"]
+        assert body["detail"]["avant_arrondi"] - body["detail"]["perte_arrondi_fcfa"] == body["plafond_ml_recommande"]
+        assert len(body["raisons"]) >= 4
 
 
 def test_simulation_alias_scenarios(monkeypatch):

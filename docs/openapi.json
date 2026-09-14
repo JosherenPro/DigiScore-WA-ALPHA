@@ -1924,19 +1924,13 @@
                         "in": "query",
                         "required": false,
                         "schema": {
-                            "anyOf": [
-                                {
-                                    "type": "number",
-                                    "minimum": 0
-                                },
-                                {
-                                    "type": "null"
-                                }
-                            ],
-                            "description": "Taux nominal annuel decimal (B7). Defaut : taux produit.",
+                            "type": "number",
+                            "minimum": 0,
+                            "description": "Taux nominal annuel decimal (B7). Defaut 14 %.",
+                            "default": 0.14,
                             "title": "Taux Nominal"
                         },
-                        "description": "Taux nominal annuel decimal (B7). Defaut : taux produit."
+                        "description": "Taux nominal annuel decimal (B7). Defaut 14 %."
                     },
                     {
                         "name": "taux_assurance",
@@ -1945,11 +1939,11 @@
                         "schema": {
                             "type": "number",
                             "minimum": 0,
-                            "description": "Taux d'assurance annuel decimal (B8). Defaut 12 %.",
-                            "default": 0.12,
+                            "description": "Taux d'assurance annuel decimal (B8). Defaut 5,7 %.",
+                            "default": 0.057,
                             "title": "Taux Assurance"
                         },
-                        "description": "Taux d'assurance annuel decimal (B8). Defaut 12 %."
+                        "description": "Taux d'assurance annuel decimal (B8). Defaut 5,7 %."
                     }
                 ],
                 "responses": {
@@ -3381,12 +3375,12 @@
                     "taux_nominal": {
                         "type": "number",
                         "title": "Taux Nominal",
-                        "default": 0.018
+                        "default": 0.14
                     },
                     "taux_assurance": {
                         "type": "number",
                         "title": "Taux Assurance",
-                        "default": 0.12
+                        "default": 0.057
                     },
                     "mensualite_hors_assurance": {
                         "type": "number",
@@ -3875,10 +3869,14 @@
                     },
                     "montant_demande": {
                         "type": "number",
+                        "maximum": 100000000.0,
+                        "exclusiveMinimum": 0.0,
                         "title": "Montant Demande"
                     },
                     "duree_mois": {
                         "type": "integer",
+                        "maximum": 60.0,
+                        "minimum": 1.0,
                         "title": "Duree Mois",
                         "default": 12
                     },
@@ -5253,6 +5251,18 @@
                             }
                         ],
                         "title": "Explication"
+                    },
+                    "detail": {
+                        "additionalProperties": true,
+                        "type": "object",
+                        "title": "Detail"
+                    },
+                    "raisons": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Raisons"
                     }
                 },
                 "type": "object",

@@ -110,6 +110,7 @@ def assistance(db: Session, application_id: int, dossier: dict | None = None) ->
                 out["scorecard"]["probabilite_defaut"],
                 rule_result=rule_result,
                 model_version=out["scorecard"]["modele_version"],
+                facteurs=out["scorecard"].get("top_factors"),
             )
         except Exception:
             out["plafond_ml"] = None

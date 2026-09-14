@@ -95,3 +95,6 @@ class PlafondMlOut(BaseModel):
     probabilite_defaut: float | None = None
     facteur_prudence: float | None = None
     explication: str | None = None
+    # Decomposition auditable du calcul + resume en langage clair.
+    detail: dict = Field(default_factory=dict)
+    raisons: list[str] = Field(default_factory=list)

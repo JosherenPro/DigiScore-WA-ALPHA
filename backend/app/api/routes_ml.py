@@ -189,4 +189,6 @@ def get_plafond_ml(
         "probabilite_defaut": plafond.get("probabilite_defaut"),
         "facteur_prudence": plafond.get("facteur_prudence"),
         "explication": plafond.get("explication"),
+        "detail": plafond.get("detail") or {},
+        "raisons": plafond.get("raisons") or [],
     }

@@ -249,8 +249,8 @@ class MemoOut(BaseModel):
 class AmortissementOut(BaseModel):
     montant: float
     duree_mois: int
-    taux_nominal: float = 0.018
-    taux_assurance: float = 0.12
+    taux_nominal: float = 0.14
+    taux_assurance: float = 0.057
     mensualite_hors_assurance: float = 0
     assurance_mensuelle: float = 0
     mensualite_totale: float = 0
