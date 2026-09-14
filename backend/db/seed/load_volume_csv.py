@@ -40,20 +40,24 @@ def _already_loaded(cur) -> bool:
     )
     cur.execute("SELECT value FROM seed_meta WHERE key = 'volume_loaded'")
     row = cur.fetchone()
-    if row:
+    if row and row[0] == "v2":
         return True
     cur.execute("SELECT COUNT(*) FROM member WHERE external_code LIKE 'VOL-%'")
-    if (cur.fetchone() or (0,))[0] > 0:
-        _mark_loaded(cur)
-        return True
+    n_vol = (cur.fetchone() or (0,))[0]
+    if n_vol:
+        raise SystemExit(
+            "Volume v1 (ou incomplet) déjà en base. Recharge unique v2 : "
+            "docker compose down -v && docker compose up -d "
+            "(laptop : VOLUME_MEMBERS=5000)."
+        )
     return False
 
 
 def _mark_loaded(cur) -> None:
     cur.execute(
         """
-        INSERT INTO seed_meta (key, value) VALUES ('volume_loaded', '1')
-        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, loaded_at = NOW()
+            INSERT INTO seed_meta (key, value) VALUES ('volume_loaded', 'v2')
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, loaded_at = NOW()
         """
     )
 
@@ -138,15 +142,16 @@ def main() -> None:
                 cur.execute(
                     """
                     CREATE TEMP TABLE stg_snap (
-                        account_no VARCHAR(30), avg_balance_3m NUMERIC, avg_balance_6m NUMERIC, avg_balance_12m NUMERIC
+                        account_no VARCHAR(30), as_of DATE,
+                        avg_balance_3m NUMERIC, avg_balance_6m NUMERIC, avg_balance_12m NUMERIC
                     )
                     """
                 )
-                copy_csv(cur, "stg_snap", "account_no,avg_balance_3m,avg_balance_6m,avg_balance_12m", snap)
+                copy_csv(cur, "stg_snap", "account_no,as_of,avg_balance_3m,avg_balance_6m,avg_balance_12m", snap)
                 cur.execute(
                     """
-                    INSERT INTO savings_snapshot (account_id, avg_balance_3m, avg_balance_6m, avg_balance_12m)
-                    SELECT a.id, s.avg_balance_3m, s.avg_balance_6m, s.avg_balance_12m
+                    INSERT INTO savings_snapshot (account_id, as_of, avg_balance_3m, avg_balance_6m, avg_balance_12m)
+                    SELECT a.id, s.as_of, s.avg_balance_3m, s.avg_balance_6m, s.avg_balance_12m
                     FROM stg_snap s
                     JOIN account a ON a.account_no = s.account_no
                     """
@@ -173,16 +178,18 @@ def main() -> None:
                 "stg_pc",
                 """
                 CREATE TEMP TABLE stg_pc (
-                    external_code VARCHAR(40), amount NUMERIC, term_months INT, granted_on DATE,
+                    external_code VARCHAR(40), institution_code VARCHAR(30), amount NUMERIC, term_months INT, granted_on DATE,
                     closed_on DATE, status VARCHAR(20), late_count INT, max_days_late INT, source VARCHAR(20)
                 )
                 """,
-                "external_code,amount,term_months,granted_on,closed_on,status,late_count,max_days_late,source",
+                "external_code,institution_code,amount,term_months,granted_on,closed_on,status,late_count,max_days_late,source",
                 "past_credit.csv",
                 """
-                INSERT INTO past_credit (member_id, amount, term_months, granted_on, closed_on, status, late_count, max_days_late, source)
-                SELECT m.id, s.amount, s.term_months, s.granted_on, s.closed_on, s.status, s.late_count, s.max_days_late, s.source
-                FROM stg_pc s JOIN member m ON m.external_code = s.external_code
+                INSERT INTO past_credit (member_id, institution_id, amount, term_months, granted_on, closed_on, status, late_count, max_days_late, source)
+                SELECT m.id, fi.id, s.amount, s.term_months, s.granted_on, s.closed_on, s.status, s.late_count, s.max_days_late, s.source
+                FROM stg_pc s
+                JOIN member m ON m.external_code = s.external_code
+                LEFT JOIN financial_institution fi ON fi.code = NULLIF(s.institution_code, '')
                 """,
                 "past_credit",
             )
@@ -261,6 +268,61 @@ def main() -> None:
                 """,
                 "digiscore_member_map",
             )
+
+            ext_acc = _exists("external_account.csv")
+            if ext_acc:
+                cur.execute(
+                    """
+                    CREATE TEMP TABLE stg_ext_acc (
+                        external_code VARCHAR(40), institution_code VARCHAR(30),
+                        account_no_mask VARCHAR(40), opened_on DATE, status VARCHAR(20), current_balance NUMERIC
+                    )
+                    """
+                )
+                copy_csv(
+                    cur,
+                    "stg_ext_acc",
+                    "external_code,institution_code,account_no_mask,opened_on,status,current_balance",
+                    ext_acc,
+                )
+                cur.execute(
+                    """
+                    INSERT INTO external_account (member_id, institution_id, account_no_mask, opened_on, status, current_balance)
+                    SELECT m.id, fi.id, s.account_no_mask, s.opened_on, s.status, s.current_balance
+                    FROM stg_ext_acc s
+                    JOIN member m ON m.external_code = s.external_code
+                    JOIN financial_institution fi ON fi.code = s.institution_code
+                    """
+                )
+                print("external_account", cur.rowcount)
+                em = _exists("external_account_movement.csv")
+                if em:
+                    cur.execute(
+                        "CREATE TEMP TABLE stg_ext_mvt (account_no_mask VARCHAR(40), moved_on DATE, movement_type VARCHAR(20), amount NUMERIC, label VARCHAR(160))"
+                    )
+                    copy_csv(cur, "stg_ext_mvt", "account_no_mask,moved_on,movement_type,amount,label", em)
+                    cur.execute(
+                        """
+                        INSERT INTO external_account_movement (account_id, moved_on, movement_type, amount, label)
+                        SELECT a.id, s.moved_on, s.movement_type, s.amount, s.label
+                        FROM stg_ext_mvt s JOIN external_account a ON a.account_no_mask = s.account_no_mask
+                        """
+                    )
+                    print("external_movements", cur.rowcount)
+                es = _exists("external_savings_snapshot.csv")
+                if es:
+                    cur.execute(
+                        "CREATE TEMP TABLE stg_ext_snap (account_no_mask VARCHAR(40), as_of DATE, avg_balance_3m NUMERIC, avg_balance_6m NUMERIC, avg_balance_12m NUMERIC)"
+                    )
+                    copy_csv(cur, "stg_ext_snap", "account_no_mask,as_of,avg_balance_3m,avg_balance_6m,avg_balance_12m", es)
+                    cur.execute(
+                        """
+                        INSERT INTO external_savings_snapshot (account_id, as_of, avg_balance_3m, avg_balance_6m, avg_balance_12m)
+                        SELECT a.id, s.as_of, s.avg_balance_3m, s.avg_balance_6m, s.avg_balance_12m
+                        FROM stg_ext_snap s JOIN external_account a ON a.account_no_mask = s.account_no_mask
+                        """
+                    )
+                    print("external_snapshots", cur.rowcount)
 
             app_csv = _exists("credit_application.csv")
             if app_csv:
@@ -387,13 +449,13 @@ def main() -> None:
                 cash = _exists("monthly_cashflow.csv")
                 if cash:
                     cur.execute(
-                        "CREATE TEMP TABLE stg_cash (app_ref VARCHAR(20), month_no INT, inflow NUMERIC, outflow NUMERIC)"
+                        "CREATE TEMP TABLE stg_cash (app_ref VARCHAR(20), month_no INT, period_month DATE, inflow NUMERIC, outflow NUMERIC)"
                     )
-                    copy_csv(cur, "stg_cash", "app_ref,month_no,inflow,outflow", cash)
+                    copy_csv(cur, "stg_cash", "app_ref,month_no,period_month,inflow,outflow", cash)
                     cur.execute(
                         """
-                        INSERT INTO monthly_cashflow (application_id, month_no, inflow, outflow)
-                        SELECT m.application_id, s.month_no, s.inflow, s.outflow
+                        INSERT INTO monthly_cashflow (application_id, month_no, period_month, inflow, outflow)
+                        SELECT m.application_id, s.month_no, s.period_month, s.inflow, s.outflow
                         FROM stg_cash s JOIN map_app m ON m.app_ref = s.app_ref
                         """
                     )
@@ -443,6 +505,79 @@ def main() -> None:
                     )
                     print("household", cur.rowcount)
 
+                ecom = _exists("economic_model.csv")
+                if ecom:
+                    cur.execute(
+                        """
+                        CREATE TEMP TABLE stg_ecom (
+                            app_ref VARCHAR(20), client_segments VARCHAR(160), product_service VARCHAR(160),
+                            avg_price NUMERIC, unit_variable_cost NUMERIC, monthly_fixed_cost NUMERIC, sales_rhythm VARCHAR(40)
+                        )
+                        """
+                    )
+                    copy_csv(
+                        cur,
+                        "stg_ecom",
+                        "app_ref,client_segments,product_service,avg_price,unit_variable_cost,monthly_fixed_cost,sales_rhythm",
+                        ecom,
+                    )
+                    cur.execute(
+                        """
+                        INSERT INTO economic_model (
+                            application_id, client_segments, product_service, avg_price,
+                            unit_variable_cost, monthly_fixed_cost, sales_rhythm
+                        )
+                        SELECT m.application_id, s.client_segments, s.product_service, s.avg_price,
+                               s.unit_variable_cost, s.monthly_fixed_cost, s.sales_rhythm
+                        FROM stg_ecom s JOIN map_app m ON m.app_ref = s.app_ref
+                        """
+                    )
+                    print("economic_model", cur.rowcount)
+
+                mkt = _exists("market.csv")
+                if mkt:
+                    cur.execute(
+                        """
+                        CREATE TEMP TABLE stg_mkt (
+                            app_ref VARCHAR(20), high_season VARCHAR(40), low_season VARCHAR(40),
+                            daily_volume NUMERIC, competitor_count INT, single_outlet_dependency BOOLEAN, proof_level CHAR(2)
+                        )
+                        """
+                    )
+                    copy_csv(
+                        cur,
+                        "stg_mkt",
+                        "app_ref,high_season,low_season,daily_volume,competitor_count,single_outlet_dependency,proof_level",
+                        mkt,
+                    )
+                    cur.execute(
+                        """
+                        INSERT INTO market (
+                            application_id, high_season, low_season, daily_volume,
+                            competitor_count, single_outlet_dependency, proof_level
+                        )
+                        SELECT m.application_id, s.high_season, s.low_season, s.daily_volume,
+                               s.competitor_count, s.single_outlet_dependency, s.proof_level
+                        FROM stg_mkt s JOIN map_app m ON m.app_ref = s.app_ref
+                        """
+                    )
+                    print("market", cur.rowcount)
+
+                docs = _exists("supporting_document.csv")
+                if docs:
+                    cur.execute(
+                        "CREATE TEMP TABLE stg_doc (app_ref VARCHAR(20), document_type VARCHAR(30), file_path VARCHAR(255), ocr_quality VARCHAR(20))"
+                    )
+                    copy_csv(cur, "stg_doc", "app_ref,document_type,file_path,ocr_quality", docs)
+                    cur.execute(
+                        """
+                        INSERT INTO supporting_document (application_id, document_type, file_path, ocr_quality, status)
+                        SELECT m.application_id, s.document_type, s.file_path, s.ocr_quality, 'recu'
+                        FROM stg_doc s JOIN map_app m ON m.app_ref = s.app_ref
+                        """
+                    )
+                    print("supporting_document", cur.rowcount)
+
             _load_member_join(
                 cur,
                 "stg_fu",
@@ -484,14 +619,15 @@ def main() -> None:
                 "stg_loan",
                 """
                 CREATE TEMP TABLE stg_loan (
-                    external_code VARCHAR(40), principal NUMERIC, outstanding NUMERIC, days_late INT, status VARCHAR(20)
+                    external_code VARCHAR(40), principal NUMERIC, outstanding NUMERIC, days_late INT, status VARCHAR(20),
+                    disbursed_on DATE, due_on DATE, observed_on DATE
                 )
                 """,
-                "external_code,principal,outstanding,days_late,status",
+                "external_code,principal,outstanding,days_late,status,disbursed_on,due_on,observed_on",
                 "outstanding_loan.csv",
                 """
-                INSERT INTO outstanding_loan (member_id, principal, outstanding, days_late, status)
-                SELECT m.id, s.principal, s.outstanding, s.days_late, s.status
+                INSERT INTO outstanding_loan (member_id, principal, outstanding, days_late, status, disbursed_on, due_on, observed_on)
+                SELECT m.id, s.principal, s.outstanding, s.days_late, s.status, s.disbursed_on, s.due_on, s.observed_on
                 FROM stg_loan s JOIN member m ON m.external_code = s.external_code
                 """,
                 "outstanding_loan",

@@ -8,6 +8,7 @@ Lookups métier via index, jamais scan de table.
 | `member(last_name, first_name)` | `idx_member_name` | Index / Bitmap |
 | `account.account_no = ?` | `idx_account_no` (UNIQUE) | Index Scan |
 | `account_movement(account_id, moved_on DESC)` | `idx_movement_account_date` | Index + LIMIT |
+| `external_account_movement(account_id, moved_on DESC)` | `idx_ext_mvt_account_date` | Index + LIMIT |
 | `past_credit.member_id` | `idx_past_credit_member` | Index Scan |
 | `credit_application.status` | `idx_application_status` | Files chef/CIC |
 
@@ -25,8 +26,8 @@ EXPLAIN ANALYZE
 Volumétrie (hors docker init) :
 
 ```bash
-python backend/db/seed/generate_volume_csv.py   # 120 000 membres + historiques
-python backend/db/seed/load_volume_csv.py       # COPY dans Postgres
+python backend/db/seed/generate_volume_csv.py   # v2 : 120k vies uniques (VOLUME_MEMBERS)
+python backend/db/seed/load_volume_csv.py       # COPY ; skip si seed_meta=v2 ; sinon down -v
 ```
 
 Agrégats épargne : `savings_snapshot` — le backend ne charge pas tout l’historique brut.

@@ -6,6 +6,7 @@
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:8000" },
+    { "key": "token", "value": "" },
     { "key": "demande_mem001", "value": "1" },
     { "key": "demande_mem004", "value": "4" },
     { "key": "demande_mem009", "value": "9" }
@@ -21,6 +22,14 @@
             "header": [],
             "url": "{{baseUrl}}/health"
           }
+        },
+        {
+          "name": "GET /capabilities",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/capabilities"
+          }
         }
       ]
     },
@@ -29,10 +38,21 @@
       "item": [
         {
           "name": "Login agent",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var j = pm.response.json();",
+                  "if (j.access_token) { pm.collectionVariables.set('token', j.access_token); }"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"login\": \"agent\"\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"login\": \"agent\",\n  \"password\": \"demo\"\n}" },
             "url": "{{baseUrl}}/auth/login"
           }
         },
@@ -41,7 +61,7 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"login\": \"chef\"\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"login\": \"chef\",\n  \"password\": \"demo\"\n}" },
             "url": "{{baseUrl}}/auth/login"
           }
         },
@@ -50,8 +70,45 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"login\": \"cic\"\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"login\": \"cic\",\n  \"password\": \"demo\"\n}" },
             "url": "{{baseUrl}}/auth/login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Référentiels",
+      "item": [
+        {
+          "name": "GET /agences",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/agences"
+          }
+        },
+        {
+          "name": "GET /institutions",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/institutions"
+          }
+        },
+        {
+          "name": "GET /referentiels",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/referentiels"
+          }
+        },
+        {
+          "name": "GET /moi",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/moi"
           }
         }
       ]
@@ -63,6 +120,7 @@
           "name": "Lookup MEM-001",
           "request": {
             "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
             "url": "{{baseUrl}}/membres?q=MEM-001&page=1&page_size=30"
           }
         },
@@ -91,7 +149,32 @@
           "name": "Historique MEM-001",
           "request": {
             "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
             "url": "{{baseUrl}}/membres/1/historique"
+          }
+        },
+        {
+          "name": "Mouvements agence MEM-001",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/membres/1/mouvements?page=1&page_size=30"
+          }
+        },
+        {
+          "name": "Comptes externes MEM-012",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/membres/12/comptes-externes"
+          }
+        },
+        {
+          "name": "Mouvements externes MEM-012",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/membres/12/mouvements-externes?page=1&page_size=30"
           }
         }
       ]
@@ -103,7 +186,16 @@
           "name": "GET demande 1",
           "request": {
             "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
             "url": "{{baseUrl}}/demandes/{{demande_mem001}}"
+          }
+        },
+        {
+          "name": "GET scores historique demande 1",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/demandes/{{demande_mem001}}/scores"
           }
         },
         {
@@ -117,7 +209,7 @@
           "name": "POST soumettre",
           "request": {
             "method": "POST",
-            "url": "{{baseUrl}}/demandes/{{demande_mem001}}/soumettre?utilisateur_id=1"
+            "url": "{{baseUrl}}/demandes/{{demande_mem001}}/soumettre"
           }
         },
         {
@@ -183,7 +275,7 @@
           "name": "POST soumettre → file cic",
           "request": {
             "method": "POST",
-            "url": "{{baseUrl}}/demandes/{{demande_mem009}}/soumettre?utilisateur_id=1"
+            "url": "{{baseUrl}}/demandes/{{demande_mem009}}/soumettre"
           }
         }
       ]

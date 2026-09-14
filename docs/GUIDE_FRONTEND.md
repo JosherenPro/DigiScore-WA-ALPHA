@@ -1,6 +1,7 @@
 # Guide frontend — DigiScore-WA
 
-**Brief agent IA (A→Z, à coller tel quel)** : [PROMPT_AGENT_FRONTEND.md](PROMPT_AGENT_FRONTEND.md).
+**Brief agent IA (A→Z, à coller tel quel)** : [PROMPT_AGENT_FRONTEND.md](PROMPT_AGENT_FRONTEND.md).  
+**Note courte (auth + `.items`)** : [SYNTHESE_RESPONSABLE_FRONTEND.md](SYNTHESE_RESPONSABLE_FRONTEND.md).
 
 Tu consommes **uniquement** l’API JSON. Les formules (CAF, RCSD, EBE, score /100, plafond) sont calculées par le package `scoring` via le back. **Interdit** de les recoder dans React.
 
@@ -23,7 +24,13 @@ Swagger : http://localhost:8000/docs
 OpenAPI figé : [openapi.json](openapi.json)  
 Postman + scénarios : [postman/README.md](postman/README.md)
 
-Logins démo (pas de mot de passe, pas de JWT / SSO) : `agent` · `chef` · `cic`.
+Logins démo : `agent` / `chef` / `cic`, mot de passe **`demo`**.
+
+Header : `Authorization: Bearer <access_token>` (réponse de `POST /auth/login`).
+
+Sans token → 401. Agent sur `/files/cic` → 403.
+
+**P0 pagination** : les listes sont `{ items, page, page_size, total }` — itère sur `.items` (membres, demandes, files, **mouvements**).
 
 ## JSON FR, pas les colonnes SQL
 
@@ -57,10 +64,16 @@ Ne charge pas 120k d’un coup. Infinite scroll / pager sur `total`.
 
 | Écran | Endpoint | Notes |
 |-------|----------|--------|
-| Login 3 rôles | `POST /auth/login` | body `{ "login": "agent" }` → `{ id, login, nom, role }` |
+| Login 3 rôles | `POST /auth/login` | `{ "login": "agent", "password": "demo" }` → token + `user` |
 | Lookup membre | `GET /membres?q=&page=&page_size=` | Afficher `statut` (geler = pas de nouvelle demande) |
-| Fiche + historique | `GET /membres/{id}` et `/historique` | Compte, crédits passés, incidents, `thin_file` |
+| Fiche | `GET /membres/{id}` | Agence, compte local, totaux, `nb_comptes_externes`, `thin_file` |
+| Historique | `GET /membres/{id}/historique` | Crédits + incidents + **30 mvts agence** + résumé ailleurs (pas un alias de la fiche) |
+| Mouvements agence | `GET /membres/{id}/mouvements?page=` | `{ items, page, page_size, total }` |
+| Ailleurs (COOPEC/banque/IMF) | `GET /membres/{id}/comptes-externes` · `/mouvements-externes` | **Pas** Flooz / T-Money ; pas mélangé au livre agence |
+| Agences / IF / enums | `GET /agences` · `/institutions` · `/referentiels` · `/moi` | Bearer ; `/moi` = même `user` que le login |
 | Produits | `GET /produits` | Seuil caution, flag exceptionnel |
+| Dossier | `GET /demandes/{id}` | Membre, produit, collecte A–E, trésorerie 12 mois, score courant |
+| Historique score | `GET /demandes/{id}/scores` | Lignes `score_result_history` |
 | Wizard A–E | `POST /demandes` puis `POST /demandes/{id}/collecte` | Clés collecte = `ca`, `cmv`, `charges_exploitation`… |
 | Pièces / OCR | `POST /demandes/{id}/pieces` | `qualite_ocr` `flou`/`sombre`/`coupe` → 400, refaire la photo |
 | Résultat demandé vs éligible | `POST /demandes/{id}/analyser` + `GET /demandes/{id}` | Afficher `montant_demande` vs `score.montant_eligible`, zone, `message_humain` |
@@ -72,7 +85,7 @@ Ne charge pas 120k d’un coup. Infinite scroll / pager sur `total`.
 | Maquette M6 | `GET /vision/portefeuille` | PAR + alertes (pas live) |
 | Maquette M7 | `GET /vision/recouvrement` | 4 niveaux |
 
-Décision : `{ niveau, avis, motif, utilisateur_id, override }`. Motif **obligatoire** si écart à la recommandation.
+Décision : `{ niveau, avis, motif, override }` — **plus de `utilisateur_id`** (pris dans le JWT). Motif **obligatoire** si écart à la recommandation.
 
 Zones score (affichage, déjà dans `score.zone`) : `rejet` · `analyse` · `approbation`.
 

@@ -11,6 +11,8 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./backend/db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
       - ./backend/db/seed/02_metier.sql:/docker-entrypoint-initdb.d/02_metier.sql:ro
+      - ./backend/db/seed/03_auth_alter.sql:/docker-entrypoint-initdb.d/03_auth_alter.sql:ro
+      - ./backend/db/seed/04_data_alter.sql:/docker-entrypoint-initdb.d/04_data_alter.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U digiscore"]
       interval: 5s
@@ -34,7 +36,7 @@ services:
       VOLUME_DIR: /data/volume
       LOAD_VOLUME: ${LOAD_VOLUME:-1}
       VOLUME_MEMBERS: ${VOLUME_MEMBERS:-120000}
-      VOLUME_APPLICATIONS: ${VOLUME_APPLICATIONS:-8000}
+      VOLUME_APPLICATIONS: ${VOLUME_APPLICATIONS:-20000}
     volumes:
       - ./data/synthetic/volume:/data/volume
     depends_on:

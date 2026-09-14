@@ -49,3 +49,5 @@ Index lookup `member.external_code` / `account.account_no`. Historique : LIMIT +
 | Pilote agence | 4–8 vCPU | 8–16 Go | 50–100 Go SSD |
 
 Pas de GPU, pas de cluster K8s au pilote, pas de droits DROP/ALTER partenaires.
+
+Auth démo 3 rôles (JWT) : simule le flux. Greffe SI (HMAC agence) : [SECURITE_ECHANGES_PILOTE.md](SECURITE_ECHANGES_PILOTE.md) — **si retenus**, pas dans le code démo.

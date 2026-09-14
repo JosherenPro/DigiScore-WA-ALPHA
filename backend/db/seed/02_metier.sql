@@ -4,15 +4,22 @@ INSERT INTO agency (code, name, city, topology) VALUES
     ('AGE-LME-01', 'COOPEC Demo Lome Centre', 'Lome', 'shared'),
     ('AGE-KPA-01', 'COOPEC Demo Kpalime', 'Kpalime', 'split');
 
+INSERT INTO financial_institution (code, name, city, kind) VALUES
+    ('IF-COOPEC-KPA', 'COOPEC Kpalime Union', 'Kpalime', 'coopec'),
+    ('IF-COOPEC-SOK', 'COOPEC Sokode', 'Sokode', 'coopec'),
+    ('IF-BTCI', 'BTCI Lome', 'Lome', 'banque'),
+    ('IF-UTB', 'UTB', 'Lome', 'banque'),
+    ('IF-WAGES', 'WAGES', 'Lome', 'microfinance');
+
 INSERT INTO credit_product (code, label, min_amount, max_amount, max_term_months, indicative_rate, guarantor_threshold, min_guarantors, is_exceptional) VALUES
     ('COM-STD', 'Credit commerce standard', 50000, 3000000, 18, 0.018, 2000000, 1, FALSE),
     ('AGR-SAI', 'Credit agricole saisonnier', 100000, 2500000, 12, 0.016, 2000000, 1, FALSE),
     ('EXC-10M', 'Credit exceptionnel CIC', 5000000, 12000000, 36, 0.015, 2000000, 2, TRUE);
 
-INSERT INTO app_user (login, full_name, role, agency_id) VALUES
-    ('agent', 'Ama Agent', 'agent', 1),
-    ('chef', 'Koffi Chef', 'chef_agence', 1),
-    ('cic', 'Comite CIC', 'cic', 1);
+INSERT INTO app_user (login, full_name, role, agency_id, password_hash) VALUES
+    ('agent', 'Ama Agent', 'agent', 1, '$2b$12$9OfpiTAhhmsHN9nRwDdFLOf7DiSl.eSp0MhZBA0Iu8Ypca.jMW1iC'),
+    ('chef', 'Koffi Chef', 'chef_agence', 1, '$2b$12$9OfpiTAhhmsHN9nRwDdFLOf7DiSl.eSp0MhZBA0Iu8Ypca.jMW1iC'),
+    ('cic', 'Comite CIC', 'cic', 1, '$2b$12$9OfpiTAhhmsHN9nRwDdFLOf7DiSl.eSp0MhZBA0Iu8Ypca.jMW1iC');
 
 INSERT INTO member (external_code, last_name, first_name, gender, phone, area, agency_id, joined_on, status, marital_status, occupation) VALUES
     ('MEM-001', 'Mensah', 'Kodjo', 'M', '90111111', 'urbaine', 1, '2021-03-01', 'actif', 'marie', 'commercant'),
@@ -42,41 +49,75 @@ INSERT INTO account (member_id, account_no, account_type, opened_on, status, cur
     (11, 'CPT-011', 'epargne', '2019-08-01', 'actif', 300000),
     (12, 'CPT-012', 'epargne', '2026-06-01', 'actif', 45000);
 
-INSERT INTO savings_snapshot (account_id, avg_balance_3m, avg_balance_6m, avg_balance_12m) VALUES
-    (1, 420000, 400000, 380000),
-    (2, 260000, 250000, 240000),
-    (3, 35000, 40000, 50000),
-    (4, 30000, 20000, 15000),
-    (5, 600000, 580000, 550000),
-    (6, 160000, 150000, 140000),
-    (7, 140000, 130000, 120000),
-    (8, 80000, 85000, 90000),
-    (9, 1700000, 1600000, 1500000),
-    (10, 8000, 9000, 10000),
-    (11, 280000, 270000, 260000),
-    (12, 40000, 30000, 20000);
+INSERT INTO savings_snapshot (account_id, as_of, avg_balance_3m, avg_balance_6m, avg_balance_12m) VALUES
+    (1,  '2026-09-13', 420000, 400000, 380000),
+    (2,  '2026-09-13', 260000, 250000, 240000),
+    (3,  '2026-09-13', 35000, 40000, 50000),
+    (4,  '2026-09-13', 30000, 20000, 15000),
+    (5,  '2026-09-13', 600000, 580000, 550000),
+    (6,  '2026-09-13', 160000, 150000, 140000),
+    (7,  '2026-09-13', 140000, 130000, 120000),
+    (8,  '2026-09-13', 80000, 85000, 90000),
+    (9,  '2026-09-13', 1700000, 1600000, 1500000),
+    (10, '2026-09-13', 8000, 9000, 10000),
+    (11, '2026-09-13', 280000, 270000, 260000),
+    (12, '2026-09-13', 40000, 30000, 20000);
 
 INSERT INTO account_movement (account_id, moved_on, movement_type, amount, label) VALUES
-    (1, '2026-08-01', 'depot', 80000, 'Epargne mensuelle'),
-    (1, '2026-07-01', 'depot', 80000, 'Epargne mensuelle'),
-    (1, '2026-06-01', 'depot', 75000, 'Epargne mensuelle'),
-    (2, '2026-08-05', 'depot', 40000, 'Epargne'),
-    (3, '2026-08-10', 'retrait', 20000, 'Retrait urgence'),
-    (5, '2026-08-01', 'depot', 100000, 'Epargne reguliere'),
-    (5, '2026-07-01', 'depot', 100000, 'Epargne reguliere'),
-    (9, '2026-08-01', 'depot', 200000, 'Epargne'),
-    (4, '2026-08-15', 'depot', 10000, 'Premier depot');
+    (1, '2026-08-01', 'depot', 80000, 'Depot boutique Mensah 08'),
+    (1, '2026-07-01', 'depot', 82000, 'Depot boutique Mensah 07'),
+    (1, '2026-06-01', 'depot', 75000, 'Depot boutique Mensah 06'),
+    (1, '2026-05-12', 'depot', 71000, 'Depot boutique Mensah 05'),
+    (1, '2026-04-03', 'retrait', 15000, 'Retrait stock Mensah'),
+    (1, '2026-03-15', 'interet', 2100, 'Interet CPT-001'),
+    (2, '2026-08-05', 'depot', 40000, 'Depot etal Ama'),
+    (2, '2026-07-18', 'depot', 38000, 'Depot etal Ama 07'),
+    (3, '2026-08-10', 'retrait', 20000, 'Retrait urgence Yao'),
+    (3, '2026-06-02', 'depot', 12000, 'Depot moto-taxi Yao'),
+    (5, '2026-08-01', 'depot', 100000, 'Depot menuiserie Agbeko'),
+    (5, '2026-07-01', 'depot', 98000, 'Depot menuiserie Agbeko 07'),
+    (5, '2026-05-20', 'depot', 90000, 'Depot menuiserie Agbeko 05'),
+    (9, '2026-08-01', 'depot', 200000, 'Depot entrepot Gbeglo'),
+    (9, '2026-06-11', 'depot', 180000, 'Depot entrepot Gbeglo 06'),
+    (9, '2026-03-01', 'interet', 8500, 'Interet CPT-009'),
+    (4, '2026-08-15', 'depot', 10000, 'Premier depot Slim');
 
-INSERT INTO past_credit (member_id, amount, term_months, granted_on, closed_on, status, late_count, max_days_late, source) VALUES
-    (1, 400000, 12, '2024-01-10', '2025-01-10', 'solde', 0, 0, 'interne'),
-    (1, 600000, 12, '2025-03-01', '2026-03-01', 'solde', 0, 0, 'interne'),
-    (2, 500000, 12, '2024-06-01', '2025-06-01', 'solde', 1, 5, 'interne'),
-    (3, 350000, 10, '2025-01-01', NULL, 'impaye', 4, 45, 'interne'),
-    (7, 250000, 8, '2025-04-01', '2026-01-01', 'solde', 2, 18, 'interne'),
-    (8, 200000, 6, '2025-02-01', '2025-08-01', 'solde', 1, 8, 'interne'),
-    (9, 2500000, 24, '2023-01-01', '2025-01-01', 'solde', 0, 0, 'interne'),
-    (9, 3000000, 24, '2025-02-01', NULL, 'en_cours', 0, 0, 'interne'),
-    (11, 300000, 10, '2024-02-01', '2025-01-01', 'solde', 0, 0, 'interne');
+INSERT INTO account_movement (account_id, moved_on, movement_type, amount, label)
+SELECT 1,
+       DATE '2024-01-08' + (g * 21),
+       CASE WHEN g % 11 = 0 THEN 'interet' WHEN g % 6 = 0 THEN 'retrait' ELSE 'depot' END,
+       28000 + g * 1730,
+       'Livret Mensah dense #' || g
+FROM generate_series(0, 39) AS g;
+
+INSERT INTO account_movement (account_id, moved_on, movement_type, amount, label)
+SELECT 5,
+       DATE '2023-02-10' + (g * 28),
+       CASE WHEN g % 10 = 0 THEN 'interet' WHEN g % 7 = 0 THEN 'retrait' ELSE 'depot' END,
+       41000 + g * 2210,
+       'Atelier Agbeko dense #' || g
+FROM generate_series(0, 35) AS g;
+
+INSERT INTO account_movement (account_id, moved_on, movement_type, amount, label)
+SELECT 9,
+       DATE '2022-03-04' + (g * 18),
+       CASE WHEN g % 12 = 0 THEN 'interet' WHEN g % 5 = 0 THEN 'retrait' ELSE 'depot' END,
+       95000 + g * 4500,
+       'Entrepot Gbeglo dense #' || g
+FROM generate_series(0, 47) AS g;
+
+INSERT INTO past_credit (member_id, amount, term_months, granted_on, closed_on, status, late_count, max_days_late, source, institution_id) VALUES
+    (1, 400000, 12, '2024-01-10', '2025-01-10', 'solde', 0, 0, 'interne', NULL),
+    (1, 600000, 12, '2025-03-01', '2026-03-01', 'solde', 0, 0, 'interne', NULL),
+    (2, 500000, 12, '2024-06-01', '2025-06-01', 'solde', 1, 5, 'interne', NULL),
+    (3, 350000, 10, '2025-01-01', NULL, 'impaye', 4, 45, 'interne', NULL),
+    (7, 250000, 8, '2025-04-01', '2026-01-01', 'solde', 2, 18, 'interne', NULL),
+    (8, 200000, 6, '2025-02-01', '2025-08-01', 'solde', 1, 8, 'interne', NULL),
+    (9, 2500000, 24, '2023-01-01', '2025-01-01', 'solde', 0, 0, 'interne', NULL),
+    (9, 3000000, 24, '2025-02-01', NULL, 'en_cours', 0, 0, 'interne', NULL),
+    (11, 300000, 10, '2024-02-01', '2025-01-01', 'solde', 0, 0, 'interne', NULL),
+    (12, 280000, 12, '2024-02-01', '2025-02-01', 'solde', 0, 0, 'externe',
+        (SELECT id FROM financial_institution WHERE code = 'IF-BTCI'));
 
 INSERT INTO incident (member_id, incident_type, occurred_on, severity, detail) VALUES
     (3, 'retard', '2026-07-01', 'grave', 'Promesse non tenue + 45 j'),
@@ -88,6 +129,18 @@ INSERT INTO member_guarantee (member_id, kind, value_amount) VALUES
     (2, 'Equipement boutique', 200000),
     (5, 'Terrain familial', 800000),
     (9, 'Fonds de commerce + vehicule', 6000000);
+
+INSERT INTO external_account (member_id, institution_id, account_no_mask, opened_on, status, current_balance) VALUES
+    (12, (SELECT id FROM financial_institution WHERE code = 'IF-BTCI'), 'EXT-TCI-0000012', '2024-03-01', 'actif', 95000);
+
+INSERT INTO external_account_movement (account_id, moved_on, movement_type, amount, label) VALUES
+    (1, '2026-08-02', 'depot', 25000, 'Depot salaire BTCI Extern'),
+    (1, '2026-07-02', 'depot', 24000, 'Depot salaire BTCI Extern 07'),
+    (1, '2026-06-02', 'retrait', 8000, 'Retrait BTCI Extern'),
+    (1, '2025-12-15', 'depot', 30000, 'Depot fin annee BTCI');
+
+INSERT INTO external_savings_snapshot (account_id, as_of, avg_balance_3m, avg_balance_6m, avg_balance_12m) VALUES
+    (1, '2026-09-13', 90000, 85000, 70000);
 
 INSERT INTO bic_consent (member_id, signed_on, status, scan_path) VALUES
     (1, '2026-09-01', 'signe', 'seed/bic_consent_001.pdf'),
@@ -169,8 +222,8 @@ INSERT INTO market (application_id, high_season, low_season, daily_volume, compe
     (6, 'oct-dec', 'juin-aout', 8, 3, TRUE, 'N2'),
     (9, 'toute_annee', 'juin', 25, 4, FALSE, 'N3');
 
-INSERT INTO monthly_cashflow (application_id, month_no, inflow, outflow)
-SELECT d, m,
+INSERT INTO monthly_cashflow (application_id, month_no, period_month, inflow, outflow)
+SELECT d, m, make_date(2025, m, 1),
     CASE WHEN d = 6 AND m IN (6, 7, 8) THEN 40000 ELSE 200000 END,
     CASE WHEN d = 6 AND m IN (6, 7, 8) THEN 180000 ELSE 160000 END
 FROM generate_series(1, 11) AS d, generate_series(1, 12) AS m;
@@ -214,9 +267,9 @@ INSERT INTO recovery_action (case_id, action_on, action_type, note) VALUES
     (1, '2026-08-16', 'appel', 'Promesse de paiement non tenue'),
     (1, '2026-08-28', 'visite', 'Absent au domicile');
 
-INSERT INTO outstanding_loan (member_id, application_id, principal, outstanding, days_late, status) VALUES
-    (3, NULL, 350000, 210000, 45, 'impaye'),
-    (9, NULL, 3000000, 2200000, 0, 'en_cours');
+INSERT INTO outstanding_loan (member_id, application_id, principal, outstanding, days_late, status, disbursed_on, due_on, observed_on) VALUES
+    (3, NULL, 350000, 210000, 45, 'impaye', '2025-01-01', '2025-11-01', '2026-09-13'),
+    (9, NULL, 3000000, 2200000, 0, 'en_cours', '2025-02-01', '2027-02-01', '2026-09-13');
 
 INSERT INTO digiscore_member_map (member_id, external_code, source_system)
 SELECT id, external_code, 'core_stub' FROM member;

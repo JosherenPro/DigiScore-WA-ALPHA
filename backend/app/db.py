@@ -1,6 +1,10 @@
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import os
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 DATABASE_URL = os.getenv(
@@ -18,3 +22,12 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def ping_db() -> bool:
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return True
+    except Exception:
+        return False

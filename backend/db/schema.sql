@@ -34,14 +34,26 @@ COMMENT ON TABLE credit_product IS 'Catalogue produits. Au-dela de guarantor_thr
 COMMENT ON COLUMN credit_product.guarantor_threshold IS 'Seuil (FCFA) a partir duquel des cautions eligibles sont exigibles.';
 COMMENT ON COLUMN credit_product.is_exceptional IS 'Voie exceptionnelle (gros tickets) : CIC obligatoire.';
 
-CREATE TABLE app_user (
-    id          SERIAL PRIMARY KEY,
-    login       VARCHAR(40) UNIQUE NOT NULL,
-    full_name   VARCHAR(80) NOT NULL,
-    role        VARCHAR(20) NOT NULL CHECK (role IN ('agent', 'chef_agence', 'cic')),
-    agency_id   INT REFERENCES agency (id)
+CREATE TABLE financial_institution (
+    id      SERIAL PRIMARY KEY,
+    code    VARCHAR(30) UNIQUE NOT NULL,
+    name    VARCHAR(120) NOT NULL,
+    city    VARCHAR(80) NOT NULL DEFAULT 'Lome',
+    kind    VARCHAR(20) NOT NULL
+            CHECK (kind IN ('coopec', 'banque', 'microfinance'))
 );
-COMMENT ON TABLE app_user IS 'Utilisateurs DigiScore (agent, chef d''agence, CIC).';
+COMMENT ON TABLE financial_institution IS 'Autres IF (COOPEC, banque, IMF). Pas de mobile money.';
+
+CREATE TABLE app_user (
+    id             SERIAL PRIMARY KEY,
+    login          VARCHAR(40) UNIQUE NOT NULL,
+    full_name      VARCHAR(80) NOT NULL,
+    role           VARCHAR(20) NOT NULL CHECK (role IN ('agent', 'chef_agence', 'cic')),
+    agency_id      INT REFERENCES agency (id),
+    password_hash  VARCHAR(128)
+);
+COMMENT ON TABLE app_user IS 'Utilisateurs DigiScore demo (agent, chef d''agence, CIC). Mot de passe = simulation du flux, pas l''annuaire SI.';
+COMMENT ON COLUMN app_user.password_hash IS 'bcrypt. Login demo : agent / chef / cic, mot de passe demo.';
 
 -- ---------------------------------------------------------------------------
 -- Membre / compte / historique institutionnel
@@ -106,15 +118,19 @@ CREATE INDEX idx_movement_account_date ON account_movement (account_id, moved_on
 CREATE TABLE savings_snapshot (
     id              SERIAL PRIMARY KEY,
     account_id      INT NOT NULL REFERENCES account (id),
+    as_of           DATE NOT NULL DEFAULT DATE '2026-09-13',
     avg_balance_3m  NUMERIC(14, 0) NOT NULL DEFAULT 0,
     avg_balance_6m  NUMERIC(14, 0) NOT NULL DEFAULT 0,
-    avg_balance_12m NUMERIC(14, 0) NOT NULL DEFAULT 0
+    avg_balance_12m NUMERIC(14, 0) NOT NULL DEFAULT 0,
+    UNIQUE (account_id, as_of)
 );
 COMMENT ON TABLE savings_snapshot IS 'Agregats epargne precalcules (perf 1M+) : evite de relire tous les mouvements.';
+COMMENT ON COLUMN savings_snapshot.as_of IS 'Date de photo. UNIQUE(account_id, as_of).';
 
 CREATE TABLE past_credit (
     id              SERIAL PRIMARY KEY,
     member_id       INT NOT NULL REFERENCES member (id),
+    institution_id  INT REFERENCES financial_institution (id),
     amount          NUMERIC(14, 0) NOT NULL,
     term_months     INT NOT NULL,
     granted_on      DATE,
@@ -127,6 +143,7 @@ CREATE TABLE past_credit (
                     CHECK (source IN ('interne', 'externe', 'bic'))
 );
 COMMENT ON TABLE past_credit IS 'Credits internes (ou externes/BIC). source=interne | externe | bic.';
+COMMENT ON COLUMN past_credit.institution_id IS 'NULL = cette COOPEC. Renseigne si source externe/bic.';
 
 CREATE INDEX idx_past_credit_member ON past_credit (member_id);
 
@@ -150,6 +167,43 @@ CREATE TABLE member_guarantee (
     value_amount NUMERIC(14, 0) NOT NULL DEFAULT 0
 );
 COMMENT ON TABLE member_guarantee IS 'Garanties materielles deja connues au niveau membre.';
+
+CREATE TABLE external_account (
+    id               SERIAL PRIMARY KEY,
+    member_id        INT NOT NULL REFERENCES member (id) ON DELETE CASCADE,
+    institution_id   INT NOT NULL REFERENCES financial_institution (id),
+    account_no_mask  VARCHAR(40) NOT NULL UNIQUE,
+    opened_on        DATE NOT NULL,
+    status           VARCHAR(20) NOT NULL DEFAULT 'actif'
+                     CHECK (status IN ('actif', 'gele', 'cloture')),
+    current_balance  NUMERIC(14, 0) NOT NULL DEFAULT 0
+);
+COMMENT ON TABLE external_account IS 'Compte chez une autre IF (extrait). Pas de mobile money.';
+
+CREATE INDEX idx_ext_account_member ON external_account (member_id);
+
+CREATE TABLE external_account_movement (
+    id              SERIAL PRIMARY KEY,
+    account_id      INT NOT NULL REFERENCES external_account (id) ON DELETE CASCADE,
+    moved_on        DATE NOT NULL,
+    movement_type   VARCHAR(20) NOT NULL CHECK (movement_type IN ('depot', 'retrait', 'interet')),
+    amount          NUMERIC(14, 0) NOT NULL,
+    label           VARCHAR(160)
+);
+COMMENT ON TABLE external_account_movement IS 'Releve ailleurs. Jamais melange a account_movement.';
+
+CREATE INDEX idx_ext_mvt_account_date ON external_account_movement (account_id, moved_on DESC);
+
+CREATE TABLE external_savings_snapshot (
+    id              SERIAL PRIMARY KEY,
+    account_id      INT NOT NULL REFERENCES external_account (id) ON DELETE CASCADE,
+    as_of           DATE NOT NULL,
+    avg_balance_3m  NUMERIC(14, 0) NOT NULL DEFAULT 0,
+    avg_balance_6m  NUMERIC(14, 0) NOT NULL DEFAULT 0,
+    avg_balance_12m NUMERIC(14, 0) NOT NULL DEFAULT 0,
+    UNIQUE (account_id, as_of)
+);
+COMMENT ON TABLE external_savings_snapshot IS 'Photo epargne ailleurs, datee.';
 
 -- ---------------------------------------------------------------------------
 -- Demande + collecte terrain A-E
@@ -284,10 +338,12 @@ CREATE TABLE monthly_cashflow (
     id              SERIAL PRIMARY KEY,
     application_id  INT NOT NULL REFERENCES credit_application (id) ON DELETE CASCADE,
     month_no        INT NOT NULL CHECK (month_no BETWEEN 1 AND 12),
+    period_month    DATE,
     inflow          NUMERIC(14, 0) NOT NULL DEFAULT 0,
     outflow         NUMERIC(14, 0) NOT NULL DEFAULT 0
 );
 COMMENT ON TABLE monthly_cashflow IS 'Tresorerie 12 mois. Interdit de lisser le CA annuel en 12 parts egales.';
+COMMENT ON COLUMN monthly_cashflow.period_month IS '1er du mois calendaire (ancre saison).';
 
 CREATE TABLE application_guarantee (
     id              SERIAL PRIMARY KEY,
@@ -312,9 +368,30 @@ CREATE TABLE financial_ratio (
     working_capital_pct NUMERIC(8, 2),
     net_worth           NUMERIC(14, 2),
     weak_ratio_count    INT NOT NULL DEFAULT 0,
-    stress_month        INT
+    stress_month        INT,
+    computed_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-COMMENT ON TABLE financial_ratio IS 'Resultats M2 : EBE, CAF, RCSD, 6 ratios, mois critique.';
+COMMENT ON TABLE financial_ratio IS 'Resultats M2 courants. Historique = financial_ratio_history.';
+
+CREATE TABLE financial_ratio_history (
+    history_id          SERIAL PRIMARY KEY,
+    archived_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    application_id      INT NOT NULL REFERENCES credit_application (id) ON DELETE CASCADE,
+    ebe                 NUMERIC(14, 2),
+    caf                 NUMERIC(14, 2),
+    rcsd                NUMERIC(8, 3),
+    gross_margin_pct    NUMERIC(8, 2),
+    net_margin_pct      NUMERIC(8, 2),
+    solvency            NUMERIC(8, 3),
+    inventory_days      NUMERIC(10, 1),
+    equity_ratio_pct    NUMERIC(8, 2),
+    working_capital_pct NUMERIC(8, 2),
+    net_worth           NUMERIC(14, 2),
+    weak_ratio_count    INT NOT NULL DEFAULT 0,
+    stress_month        INT,
+    computed_at         TIMESTAMPTZ
+);
+COMMENT ON TABLE financial_ratio_history IS 'Copies avant ecrasement /analyser.';
 
 -- ---------------------------------------------------------------------------
 -- BIC / fiscal / pieces
@@ -410,9 +487,32 @@ CREATE TABLE score_result (
     criteria              JSONB NOT NULL DEFAULT '[]',
     knockouts             JSONB NOT NULL DEFAULT '[]',
     explanation           JSONB NOT NULL DEFAULT '[]',
+    engine_version        VARCHAR(40) NOT NULL DEFAULT 'rules-v1',
     created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-COMMENT ON TABLE score_result IS 'Sortie moteur : score/100, plafond, message type telecom.';
+COMMENT ON TABLE score_result IS 'Sortie moteur courante (1 ligne / demande). Historique = score_result_history.';
+
+CREATE TABLE score_result_history (
+    history_id            SERIAL PRIMARY KEY,
+    archived_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    application_id        INT NOT NULL REFERENCES credit_application (id) ON DELETE CASCADE,
+    score_total           NUMERIC(6, 2) NOT NULL,
+    thin_file             BOOLEAN NOT NULL DEFAULT FALSE,
+    eligible              BOOLEAN NOT NULL DEFAULT FALSE,
+    requested_amount      NUMERIC(14, 0) NOT NULL,
+    eligible_amount       NUMERIC(14, 0) NOT NULL,
+    suggested_max_amount  NUMERIC(14, 0),
+    message_code          VARCHAR(40) NOT NULL,
+    message_text          TEXT NOT NULL,
+    criteria              JSONB NOT NULL DEFAULT '[]',
+    knockouts             JSONB NOT NULL DEFAULT '[]',
+    explanation           JSONB NOT NULL DEFAULT '[]',
+    engine_version        VARCHAR(40) NOT NULL DEFAULT 'rules-v1',
+    scored_at             TIMESTAMPTZ
+);
+COMMENT ON TABLE score_result_history IS 'Copies avant ecrasement /analyser. ADD-only.';
+
+CREATE INDEX idx_score_history_app ON score_result_history (application_id, archived_at DESC);
 
 CREATE TABLE amortization_line (
     id                  SERIAL PRIMARY KEY,
@@ -474,9 +574,13 @@ CREATE TABLE outstanding_loan (
     outstanding     NUMERIC(14, 0) NOT NULL,
     days_late       INT NOT NULL DEFAULT 0,
     status          VARCHAR(20) NOT NULL DEFAULT 'en_cours'
-                    CHECK (status IN ('en_cours', 'solde', 'impaye'))
+                    CHECK (status IN ('en_cours', 'solde', 'impaye')),
+    disbursed_on    DATE,
+    due_on          DATE,
+    observed_on     DATE
 );
 COMMENT ON TABLE outstanding_loan IS 'Credits decaisses (PAR). Structure M6, moteur live = OUT 72h.';
+COMMENT ON COLUMN outstanding_loan.disbursed_on IS 'Date de decaissement (cible PAR constructible).';
 
 CREATE INDEX idx_loan_member ON outstanding_loan (member_id);
 

@@ -41,13 +41,17 @@ def main() -> None:
     VOL.mkdir(parents=True, exist_ok=True)
     wait_postgres(DSN)
 
-    if not (VOL / "member.csv").exists():
-        print(f"CSV absents dans {VOL} — génération (VOLUME_MEMBERS={os.getenv('VOLUME_MEMBERS', '120000')})…")
+    manifest = VOL / "MANIFEST.txt"
+    need_gen = not (VOL / "member.csv").exists() or not (VOL / "external_account.csv").exists()
+    if manifest.exists() and "v2" not in manifest.read_text(encoding="utf-8"):
+        need_gen = True
+    if need_gen:
+        print(f"CSV v2 absents/obsolètes dans {VOL} — génération (VOLUME_MEMBERS={os.getenv('VOLUME_MEMBERS', '120000')})…")
         env = os.environ.copy()
         env["VOLUME_DIR"] = str(VOL)
         subprocess.check_call([sys.executable, str(HERE / "generate_volume_csv.py")], env=env)
     else:
-        print(f"CSV déjà présents dans {VOL} — skip génération.")
+        print(f"CSV v2 déjà présents dans {VOL} — skip génération.")
 
     subprocess.check_call([sys.executable, str(HERE / "load_volume_csv.py")])
 

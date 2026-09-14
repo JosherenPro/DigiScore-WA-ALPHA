@@ -29,8 +29,8 @@ cd frontend && npm install && npm run dev
 
 Compose lance **Postgres + Adminer + db-seed**. L’API n’est pas dans Compose.
 
-- Premier `up` : ~1–2 min (génération 120k CSV si absents + COPY). Les CSV (~72 Mo) sont gitignorés ; un clone les régénère.
-- `up` suivants : instantanés (volume `pgdata` + table `seed_meta`).
+- Premier `up` : long si génération 120k CSV v2 (histoires uniques) + COPY. CSV gitignorés. Laptop : `VOLUME_MEMBERS=5000 docker compose up -d`.
+- `up` suivants : instantanés si `seed_meta.volume_loaded=v2`. Volume v1 : `docker compose down -v` puis `up`.
 - `LOAD_VOLUME=0` : 12 profils démo seulement.
 
 | URL | Service |
@@ -42,7 +42,9 @@ Compose lance **Postgres + Adminer + db-seed**. L’API n’est pas dans Compose
 
 `.env` : `DATABASE_URL`, `VITE_API_URL` — copier [.env.example](.env.example).
 
-Logins démo : `agent` · `chef` · `cic`.
+Logins démo : `agent` / `chef` / `cic`, mot de passe **`demo`**. Header `Authorization: Bearer <token>`.
+
+Sécu SI (pilote, pas de code) : [docs/SECURITE_ECHANGES_PILOTE.md](docs/SECURITE_ECHANGES_PILOTE.md).
 
 ## Cas démo (pitch 3 minutes)
 
@@ -61,6 +63,11 @@ Logins démo : `agent` · `chef` · `cic`.
 | [docs/GUIDE_SCORING.md](docs/GUIDE_SCORING.md) | Moteur — contrat `DossierInput` / `ScoreResult`, pas de SQL |
 | [docs/GUIDE_FRONTEND.md](docs/GUIDE_FRONTEND.md) | UI — clés JSON, pagination, pages → endpoints |
 | [docs/PROMPT_AGENT_FRONTEND.md](docs/PROMPT_AGENT_FRONTEND.md) | Brief à coller dans l’agent IA du front |
+| [docs/SYNTHESE_RESPONSABLE_FRONTEND.md](docs/SYNTHESE_RESPONSABLE_FRONTEND.md) | Note front — Bearer, `.items`, mapping écrans |
+| [docs/SYNTHESE_RESPONSABLE_SCORING.md](docs/SYNTHESE_RESPONSABLE_SCORING.md) | Note scoring — 14 bugs à eux, ML masqué |
+| [docs/DONNEES_RESPONSABLE_MODELE.md](docs/DONNEES_RESPONSABLE_MODELE.md) | Scoring — mix 120k, deux cahiers, dates, reco vs décision |
+| [docs/PLAN_ROBUSTESSE_DONNEES.md](docs/PLAN_ROBUSTESSE_DONNEES.md) | Data — dates schéma avant CSV « plus réels » |
+| [docs/SECURITE_ECHANGES_PILOTE.md](docs/SECURITE_ECHANGES_PILOTE.md) | HMAC agence **si retenus** (spec, pas le code démo) |
 | [docs/postman/README.md](docs/postman/README.md) | Smoke Swagger / Postman |
 
 ## Plan H0–H72

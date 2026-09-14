@@ -28,7 +28,7 @@ def _num(v, default=0):
 def _months_since(d) -> int:
     if not d:
         return 0
-    today = date(2026, 9, 13)
+    today = date.today()
     return max(0, (today.year - d.year) * 12 + today.month - d.month)
 
 

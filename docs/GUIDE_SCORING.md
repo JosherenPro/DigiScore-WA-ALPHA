@@ -2,6 +2,9 @@
 
 Tu livres un **moteur pur**. Le back assemble le dossier et persiste le résultat. Tu ne parles pas à Postgres.
 
+Note back → scoring (bugs ML, ce qui est figé) : [SYNTHESE_RESPONSABLE_SCORING.md](SYNTHESE_RESPONSABLE_SCORING.md).  
+Données en base pour tester les cas / features plus tard : [DONNEES_RESPONSABLE_MODELE.md](DONNEES_RESPONSABLE_MODELE.md).
+
 ## Lancer la BDD (pour relire les cas, pas pour coder le package)
 
 ```bash
@@ -62,7 +65,7 @@ Tu n’as pas besoin de FastAPI pour développer. Optionnel : API sur :8000 puis
 | 4 | MEM-004 | `KNOCKOUT_RCSD` (thin-file avec capacité insuffisante) |
 | 9 | MEM-009 | `VOIE_EXCEPTIONNELLE` → file CIC |
 
-Swagger : http://localhost:8000/docs · Postman : [postman/README.md](postman/README.md).
+Swagger : http://localhost:8000/docs · Postman : [postman/README.md](postman/README.md). Relancer `/analyser` : `Authorization: Bearer` après `POST /auth/login` (`agent` / `demo`).
 
 ## `message_code` — ne pas renommer seul
 

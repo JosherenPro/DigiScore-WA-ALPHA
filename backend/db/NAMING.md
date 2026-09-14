@@ -8,7 +8,9 @@ Les **codes métier** (statuts, gravité, rôles, N1/N2/N3) restent ceux du mote
 |----------|------------|------|
 | `agency` | agence | Agence / topologie shared\|split |
 | `credit_product` | produit_credit | Produits + seuil caution |
-| `app_user` | utilisateur | agent / chef_agence / cic |
+| `app_user` | utilisateur | agent / chef_agence / cic + `password_hash` (demo) |
+| `score_result_history` | *(nouveau)* | Copies avant ré-analyse |
+| `financial_ratio_history` | *(nouveau)* | Copies ratios avant ré-analyse |
 | `member` | membre | `external_code` = NUM_CLIENT |
 | `account` | compte | Compte épargne / opérations |
 | `account_movement` | mouvement_compte | N derniers mouvements |
@@ -41,6 +43,10 @@ Les **codes métier** (statuts, gravité, rôles, N1/N2/N3) restent ceux du mote
 | `portfolio_followup` | suivi_portefeuille | V1–V3 + signaux |
 | `par_indicator` | par_indicateur | PAR 30/90 |
 | `recovery_case` | recouvrement | 4 niveaux |
-| `recovery_action` | *(nouveau)* | Journal d’actions M7 |
+| `financial_institution` | *(nouveau)* | Autres IF : `coopec` / `banque` / `microfinance` (pas e-money) |
+| `external_account` | *(nouveau)* | Compte ailleurs (n° masqué) |
+| `external_account_movement` | *(nouveau)* | Relevé ailleurs — **pas** mélangé à `account_movement` |
+| `external_savings_snapshot` | *(nouveau)* | Photo épargne ailleurs |
+| `past_credit.institution_id` | *(ajout)* | FK nullable vers l’IF si crédit hors agence |
 
 L’API HTTP garde les clés JSON existantes (contrat front).

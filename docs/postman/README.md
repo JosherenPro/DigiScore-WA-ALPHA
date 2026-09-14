@@ -19,7 +19,11 @@ cd backend && uvicorn app.main:app --reload --port 8000
 | http://localhost:8000/openapi.json | Contrat live |
 | [../openapi.json](../openapi.json) | Export figé (régénérer via `python backend/scripts/export_openapi.py`) |
 
-Pas de JWT. Logins : `agent` · `chef` · `cic`.
+JWT : `POST /auth/login` `{ "login": "agent", "password": "demo" }` → `Authorization: Bearer <access_token>`.
+
+Logins : `agent` · `chef` · `cic`. Mot de passe : **`demo`**.
+
+Listes paginées : `{ items, page, page_size, total }`.
 
 ## Collection Postman
 
@@ -40,6 +44,8 @@ IDs seed `02_metier.sql` (stables tant qu’on n’a pas `down -v` + autre seed)
 1. **Santé** — `GET /health` → `{ "status": "ok" }`.
 2. **3 rôles** — `POST /auth/login` avec `"login": "agent"` puis `chef` puis `cic`.
 3. **Lookup** — `GET /membres?q=MEM-001&page=1&page_size=30` → enveloppe `{ items, page, page_size, total }` (plus une liste nue).
+3b. **Référentiels** — `GET /agences`, `/institutions` (pas e-money), `/referentiels`, `/moi`.
+3c. **Fiche** — `GET /membres/1/historique` contient `mouvements[]` (agence). MEM-012 : `/comptes-externes` = BTCI, distinct de `/mouvements`.
 4. **MEM-001** — `POST /demandes/1/analyser` puis `/soumettre` → file **chef** (`MONTANT_OK` typique). Mémo + amortissement.
 5. **MEM-004** — fiche `thin_file: true` ; analyser → `KNOCKOUT_RCSD` (la capacité insuffisante est prioritaire).
 6. **MEM-009** — analyser → `VOIE_EXCEPTIONNELLE` ; soumettre → file **cic**.

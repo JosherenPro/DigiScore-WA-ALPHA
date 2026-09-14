@@ -16,6 +16,15 @@ class Agency(Base):
     topology = mapped_column(String)
 
 
+class FinancialInstitution(Base):
+    __tablename__ = "financial_institution"
+    id = mapped_column(Integer, primary_key=True)
+    code = mapped_column(String)
+    name = mapped_column(String)
+    city = mapped_column(String)
+    kind = mapped_column(String)
+
+
 class CreditProduct(Base):
     __tablename__ = "credit_product"
     id = mapped_column(Integer, primary_key=True)
@@ -35,6 +44,7 @@ class AppUser(Base):
     full_name = mapped_column(String)
     role = mapped_column(String)
     agency_id = mapped_column(Integer)
+    password_hash = mapped_column(String)
 
 
 class Member(Base):
@@ -44,10 +54,14 @@ class Member(Base):
     last_name = mapped_column(String)
     first_name = mapped_column(String)
     phone = mapped_column(String)
+    address = mapped_column(String)
     area = mapped_column(String)
     agency_id = mapped_column(Integer)
     joined_on = mapped_column(Date)
     status = mapped_column(String)
+    occupation = mapped_column(String)
+    marital_status = mapped_column(String)
+    gender = mapped_column(String)
 
 
 class Account(Base):
@@ -61,10 +75,21 @@ class Account(Base):
     current_balance = mapped_column(Numeric)
 
 
+class AccountMovement(Base):
+    __tablename__ = "account_movement"
+    id = mapped_column(Integer, primary_key=True)
+    account_id = mapped_column(Integer)
+    moved_on = mapped_column(Date)
+    movement_type = mapped_column(String)
+    amount = mapped_column(Numeric)
+    label = mapped_column(String)
+
+
 class SavingsSnapshot(Base):
     __tablename__ = "savings_snapshot"
     id = mapped_column(Integer, primary_key=True)
     account_id = mapped_column(Integer)
+    as_of = mapped_column(Date)
     avg_balance_3m = mapped_column(Numeric)
     avg_balance_6m = mapped_column(Numeric)
     avg_balance_12m = mapped_column(Numeric)
@@ -74,8 +99,11 @@ class PastCredit(Base):
     __tablename__ = "past_credit"
     id = mapped_column(Integer, primary_key=True)
     member_id = mapped_column(Integer)
+    institution_id = mapped_column(Integer)
     amount = mapped_column(Numeric)
     term_months = mapped_column(Integer)
+    granted_on = mapped_column(Date)
+    closed_on = mapped_column(Date)
     status = mapped_column(String)
     late_count = mapped_column(Integer)
     max_days_late = mapped_column(Integer)
@@ -90,6 +118,65 @@ class Incident(Base):
     occurred_on = mapped_column(Date)
     severity = mapped_column(String)
     detail = mapped_column(Text)
+
+
+class MemberGuarantee(Base):
+    __tablename__ = "member_guarantee"
+    id = mapped_column(Integer, primary_key=True)
+    member_id = mapped_column(Integer)
+    kind = mapped_column(String)
+    value_amount = mapped_column(Numeric)
+
+
+class ExternalAccount(Base):
+    __tablename__ = "external_account"
+    id = mapped_column(Integer, primary_key=True)
+    member_id = mapped_column(Integer)
+    institution_id = mapped_column(Integer)
+    account_no_mask = mapped_column(String)
+    opened_on = mapped_column(Date)
+    status = mapped_column(String)
+    current_balance = mapped_column(Numeric)
+
+
+class ExternalAccountMovement(Base):
+    __tablename__ = "external_account_movement"
+    id = mapped_column(Integer, primary_key=True)
+    account_id = mapped_column(Integer)
+    moved_on = mapped_column(Date)
+    movement_type = mapped_column(String)
+    amount = mapped_column(Numeric)
+    label = mapped_column(String)
+
+
+class ExternalSavingsSnapshot(Base):
+    __tablename__ = "external_savings_snapshot"
+    id = mapped_column(Integer, primary_key=True)
+    account_id = mapped_column(Integer)
+    as_of = mapped_column(Date)
+    avg_balance_3m = mapped_column(Numeric)
+    avg_balance_6m = mapped_column(Numeric)
+    avg_balance_12m = mapped_column(Numeric)
+
+
+class BicConsent(Base):
+    __tablename__ = "bic_consent"
+    id = mapped_column(Integer, primary_key=True)
+    member_id = mapped_column(Integer)
+    signed_on = mapped_column(Date)
+    status = mapped_column(String)
+    scan_path = mapped_column(String)
+
+
+class BicReport(Base):
+    __tablename__ = "bic_report"
+    id = mapped_column(Integer, primary_key=True)
+    member_id = mapped_column(Integer)
+    application_id = mapped_column(Integer)
+    external_credit_count = mapped_column(Integer)
+    bic_incident_count = mapped_column(Integer)
+    indebtedness_summary = mapped_column(Text)
+    source = mapped_column(String)
 
 
 class CreditApplication(Base):
@@ -107,6 +194,7 @@ class CreditApplication(Base):
     external_proofs_ok = mapped_column(Boolean)
     esg_exclusion = mapped_column(Boolean)
     applied_at = mapped_column(DateTime)
+    agency_id = mapped_column(Integer)
 
 
 class IncomeExpense(Base):
@@ -151,8 +239,42 @@ class MonthlyCashflow(Base):
     id = mapped_column(Integer, primary_key=True)
     application_id = mapped_column(Integer)
     month_no = mapped_column(Integer)
+    period_month = mapped_column(Date)
     inflow = mapped_column(Numeric)
     outflow = mapped_column(Numeric)
+
+
+class Household(Base):
+    __tablename__ = "household"
+    id = mapped_column(Integer, primary_key=True)
+    application_id = mapped_column(Integer)
+    household_size = mapped_column(Integer)
+    housing = mapped_column(String)
+    dependents = mapped_column(Integer)
+
+
+class EconomicModel(Base):
+    __tablename__ = "economic_model"
+    id = mapped_column(Integer, primary_key=True)
+    application_id = mapped_column(Integer)
+    client_segments = mapped_column(String)
+    product_service = mapped_column(String)
+    avg_price = mapped_column(Numeric)
+    unit_variable_cost = mapped_column(Numeric)
+    monthly_fixed_cost = mapped_column(Numeric)
+    sales_rhythm = mapped_column(String)
+
+
+class Market(Base):
+    __tablename__ = "market"
+    id = mapped_column(Integer, primary_key=True)
+    application_id = mapped_column(Integer)
+    high_season = mapped_column(String)
+    low_season = mapped_column(String)
+    daily_volume = mapped_column(Numeric)
+    competitor_count = mapped_column(Integer)
+    single_outlet_dependency = mapped_column(Boolean)
+    proof_level = mapped_column(String)
 
 
 class Activity(Base):
@@ -160,7 +282,11 @@ class Activity(Base):
     id = mapped_column(Integer, primary_key=True)
     application_id = mapped_column(Integer)
     activity_type = mapped_column(String)
+    description = mapped_column(Text)
+    seniority_months = mapped_column(Integer)
+    location_area = mapped_column(String)
     is_seasonal = mapped_column(Boolean)
+    proof_level = mapped_column(String)
 
 
 class ApplicationGuarantee(Base):
@@ -200,6 +326,27 @@ class ScoreResult(Base):
     criteria = mapped_column(JSONB)
     knockouts = mapped_column(JSONB)
     explanation = mapped_column(JSONB)
+    engine_version = mapped_column(String)
+    created_at = mapped_column(DateTime)
+
+
+class ScoreResultHistory(Base):
+    __tablename__ = "score_result_history"
+    history_id = mapped_column(Integer, primary_key=True)
+    application_id = mapped_column(Integer)
+    score_total = mapped_column(Numeric)
+    thin_file = mapped_column(Boolean)
+    eligible = mapped_column(Boolean)
+    requested_amount = mapped_column(Numeric)
+    eligible_amount = mapped_column(Numeric)
+    suggested_max_amount = mapped_column(Numeric)
+    message_code = mapped_column(String)
+    message_text = mapped_column(Text)
+    criteria = mapped_column(JSONB)
+    knockouts = mapped_column(JSONB)
+    explanation = mapped_column(JSONB)
+    engine_version = mapped_column(String)
+    scored_at = mapped_column(DateTime)
 
 
 class Decision(Base):
@@ -238,6 +385,26 @@ class FinancialRatio(Base):
     net_worth = mapped_column(Numeric)
     weak_ratio_count = mapped_column(Integer)
     stress_month = mapped_column(Integer)
+    computed_at = mapped_column(DateTime)
+
+
+class FinancialRatioHistory(Base):
+    __tablename__ = "financial_ratio_history"
+    history_id = mapped_column(Integer, primary_key=True)
+    application_id = mapped_column(Integer)
+    ebe = mapped_column(Numeric)
+    caf = mapped_column(Numeric)
+    rcsd = mapped_column(Numeric)
+    gross_margin_pct = mapped_column(Numeric)
+    net_margin_pct = mapped_column(Numeric)
+    solvency = mapped_column(Numeric)
+    inventory_days = mapped_column(Numeric)
+    equity_ratio_pct = mapped_column(Numeric)
+    working_capital_pct = mapped_column(Numeric)
+    net_worth = mapped_column(Numeric)
+    weak_ratio_count = mapped_column(Integer)
+    stress_month = mapped_column(Integer)
+    computed_at = mapped_column(DateTime)
 
 
 class AmortizationLine(Base):
@@ -255,8 +422,33 @@ class ParIndicator(Base):
     __tablename__ = "par_indicator"
     id = mapped_column(Integer, primary_key=True)
     agency_id = mapped_column(Integer)
+    as_of = mapped_column(Date)
     par30_pct = mapped_column(Numeric)
     par90_pct = mapped_column(Numeric)
+
+
+class OutstandingLoan(Base):
+    __tablename__ = "outstanding_loan"
+    id = mapped_column(Integer, primary_key=True)
+    member_id = mapped_column(Integer)
+    application_id = mapped_column(Integer)
+    principal = mapped_column(Numeric)
+    outstanding = mapped_column(Numeric)
+    days_late = mapped_column(Integer)
+    status = mapped_column(String)
+    disbursed_on = mapped_column(Date)
+    due_on = mapped_column(Date)
+    observed_on = mapped_column(Date)
+
+
+class PortfolioFollowup(Base):
+    __tablename__ = "portfolio_followup"
+    id = mapped_column(Integer, primary_key=True)
+    member_id = mapped_column(Integer)
+    visit_code = mapped_column(String)
+    visit_on = mapped_column(Date)
+    days_late = mapped_column(Integer)
+    signal = mapped_column(String)
 
 
 class RecoveryCase(Base):
@@ -266,6 +458,16 @@ class RecoveryCase(Base):
     level = mapped_column(Integer)
     action = mapped_column(String)
     owner_name = mapped_column(String)
+    opened_on = mapped_column(Date)
+
+
+class RecoveryAction(Base):
+    __tablename__ = "recovery_action"
+    id = mapped_column(Integer, primary_key=True)
+    case_id = mapped_column(Integer)
+    action_on = mapped_column(Date)
+    action_type = mapped_column(String)
+    note = mapped_column(Text)
 
 
 class SupportingDocument(Base):

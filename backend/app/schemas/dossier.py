@@ -42,18 +42,12 @@ class DecisionIn(BaseModel):
     niveau: str
     avis: str
     motif: str | None = None
-    utilisateur_id: int = 1
     override: bool = False
 
 
 class LoginIn(BaseModel):
     login: str = Field(..., examples=["agent"])
-
-
-class PieceIn(BaseModel):
-    type_piece: str
-    fichier: str = "upload/demo.jpg"
-    qualite_ocr: str = "ok"
+    password: str = Field(..., examples=["demo"])
 
 
 class LoginOut(BaseModel):
@@ -61,6 +55,19 @@ class LoginOut(BaseModel):
     login: str
     nom: str
     role: str
+    agence_id: int | None = None
+
+
+class TokenOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: LoginOut
+
+
+class PieceIn(BaseModel):
+    type_piece: str
+    fichier: str = "upload/demo.jpg"
+    qualite_ocr: str = "ok"
 
 
 class ProduitOut(BaseModel):
@@ -101,6 +108,9 @@ class CreditPasseOut(BaseModel):
     statut: str
     nb_retards: int
     jours_max_retard: int
+    source: str | None = None
+    institution: str | None = None
+    date_octroi: str | None = None
 
 
 class IncidentOut(BaseModel):
@@ -116,14 +126,22 @@ class MembreDetail(BaseModel):
     nom: str
     prenom: str
     telephone: str | None = None
+    adresse: str | None = None
+    occupation: str | None = None
     statut: str
     zone: str | None = None
     date_adhesion: str
     anciennete_mois: int
     thin_file: bool
+    agence: dict | None = None
     compte: CompteOut | None = None
     credits_passes: list[CreditPasseOut] = Field(default_factory=list)
     incidents: list[IncidentOut] = Field(default_factory=list)
+    nb_mouvements: int = 0
+    nb_credits_passes: int = 0
+    nb_demandes: int = 0
+    nb_comptes_externes: int = 0
+    garanties: list[dict] = Field(default_factory=list)
 
 
 class DemandeCreateOut(BaseModel):
@@ -188,15 +206,23 @@ class PieceOut(BaseModel):
 class DemandeDetail(BaseModel):
     id: int
     membre_id: int
+    produit_id: int | None = None
     objet: str
     montant_demande: float
     duree_mois: int
     statut: str
     situation_fiscale: str
+    membre: dict | None = None
+    produit: dict | None = None
     score: ScoreBloc | None = None
     ratios: RatiosOut | None = None
     decisions: list[DecisionOut] = Field(default_factory=list)
     pieces: list[PieceOut] = Field(default_factory=list)
+    collecte: dict | None = None
+    tresorerie: list[dict] = Field(default_factory=list)
+    patrimoine: dict | None = None
+    menage: dict | None = None
+    activite: dict | None = None
 
 
 class SoumettreOut(BaseModel):
@@ -253,3 +279,53 @@ class VisionRecouvrementOut(BaseModel):
 class HealthOut(BaseModel):
     status: str
     service: str
+    database: str = "ok"
+
+
+class CapabilitiesOut(BaseModel):
+    ml_scorecard: bool = False
+    anomalies: bool = False
+    simulation: bool = False
+    early_warning: bool = False
+    model_version: str | None = None
+
+
+class AgenceOut(BaseModel):
+    id: int
+    code: str
+    nom: str
+    ville: str | None = None
+    topologie: str | None = None
+
+
+class InstitutionOut(BaseModel):
+    id: int
+    code: str
+    nom: str
+    ville: str | None = None
+    type: str
+
+
+class ReferentielsOut(BaseModel):
+    statuts_membre: list[str]
+    statuts_demande: list[str]
+    avis: list[str]
+    niveaux: list[str]
+    zones: list[str]
+    preuves: list[str]
+    types_piece: list[str]
+    qualite_ocr: list[str]
+
+
+class MouvementOut(BaseModel):
+    date: str
+    type: str
+    montant: float
+    libelle: str | None = None
+
+
+class PageMouvements(BaseModel):
+    items: list[MouvementOut]
+    page: int
+    page_size: int
+    total: int

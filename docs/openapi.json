@@ -3,9 +3,117 @@
   "info": {
     "title": "DigiScore-WA API",
     "description": "Copilote d'éligibilité et de plafond — institutions CIF. Contrat Front ↔ Back (clés JSON FR).",
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
   "paths": {
+    "/capabilities": {
+      "get": {
+        "tags": [
+          "sante"
+        ],
+        "summary": "Capabilities",
+        "description": "Stub : ML masqué. Le moteur règles reste la seule décision exposée.",
+        "operationId": "capabilities_capabilities_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilitiesOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agences": {
+      "get": {
+        "tags": [
+          "referentiel"
+        ],
+        "summary": "List Agences",
+        "operationId": "list_agences_agences_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AgenceOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Agences Agences Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/institutions": {
+      "get": {
+        "tags": [
+          "referentiel"
+        ],
+        "summary": "List Institutions",
+        "operationId": "list_institutions_institutions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/InstitutionOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Institutions Institutions Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/referentiels": {
+      "get": {
+        "tags": [
+          "referentiel"
+        ],
+        "summary": "Referentiels",
+        "operationId": "referentiels_referentiels_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferentielsOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/auth/login": {
       "post": {
         "tags": [
@@ -29,7 +137,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LoginOut"
+                  "$ref": "#/components/schemas/TokenOut"
                 }
               }
             }
@@ -45,6 +153,32 @@
             }
           }
         }
+      }
+    },
+    "/moi": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Moi",
+        "operationId": "moi_moi_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/produits": {
@@ -69,7 +203,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/membres": {
@@ -79,6 +218,11 @@
         ],
         "summary": "Search Membres",
         "operationId": "search_membres_membres_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "q",
@@ -145,6 +289,11 @@
         ],
         "summary": "Get Membre",
         "operationId": "get_membre_membres__membre_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "membre_id",
@@ -187,6 +336,11 @@
         ],
         "summary": "Historique",
         "operationId": "historique_membres__membre_id__historique_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "membre_id",
@@ -203,8 +357,76 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MembreDetail"
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/membres/{membre_id}/mouvements": {
+      "get": {
+        "tags": [
+          "membres"
+        ],
+        "summary": "Membre Mouvements",
+        "operationId": "membre_mouvements_membres__membre_id__mouvements_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "membre_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Membre Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 30,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageMouvements"
                 }
               }
             }
@@ -222,31 +444,35 @@
         }
       }
     },
-    "/demandes": {
-      "post": {
+    "/membres/{membre_id}/credits-passes": {
+      "get": {
         "tags": [
-          "demandes"
+          "membres"
         ],
-        "summary": "Create Demande",
-        "operationId": "create_demande_demandes_post",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DemandeCreate"
-              }
+        "summary": "Membre Credits",
+        "operationId": "membre_credits_membres__membre_id__credits_passes_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "membre_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Membre Id"
             }
           }
-        },
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DemandeCreateOut"
-                }
+                "schema": {}
               }
             }
           },
@@ -261,28 +487,163 @@
             }
           }
         }
-      },
+      }
+    },
+    "/membres/{membre_id}/incidents": {
       "get": {
         "tags": [
-          "demandes"
+          "membres"
         ],
-        "summary": "List Demandes",
-        "operationId": "list_demandes_demandes_get",
+        "summary": "Membre Incidents",
+        "operationId": "membre_incidents_membres__membre_id__incidents_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
-            "name": "statut",
-            "in": "query",
-            "required": false,
+            "name": "membre_id",
+            "in": "path",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
+              "type": "integer",
+              "title": "Membre Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
-              ],
-              "title": "Statut"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/membres/{membre_id}/garanties": {
+      "get": {
+        "tags": [
+          "membres"
+        ],
+        "summary": "Membre Garanties",
+        "operationId": "membre_garanties_membres__membre_id__garanties_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "membre_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Membre Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/membres/{membre_id}/prets": {
+      "get": {
+        "tags": [
+          "membres"
+        ],
+        "summary": "Membre Prets",
+        "operationId": "membre_prets_membres__membre_id__prets_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "membre_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Membre Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/membres/{membre_id}/demandes": {
+      "get": {
+        "tags": [
+          "membres"
+        ],
+        "summary": "Membre Demandes",
+        "operationId": "membre_demandes_membres__membre_id__demandes_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "membre_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Membre Id"
             }
           },
           {
@@ -333,6 +694,409 @@
         }
       }
     },
+    "/membres/{membre_id}/bic": {
+      "get": {
+        "tags": [
+          "membres"
+        ],
+        "summary": "Membre Bic",
+        "operationId": "membre_bic_membres__membre_id__bic_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "membre_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Membre Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/membres/{membre_id}/suivi": {
+      "get": {
+        "tags": [
+          "membres"
+        ],
+        "summary": "Membre Suivi",
+        "operationId": "membre_suivi_membres__membre_id__suivi_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "membre_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Membre Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/membres/{membre_id}/recouvrement": {
+      "get": {
+        "tags": [
+          "membres"
+        ],
+        "summary": "Membre Recouvrement",
+        "operationId": "membre_recouvrement_membres__membre_id__recouvrement_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "membre_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Membre Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/membres/{membre_id}/comptes-externes": {
+      "get": {
+        "tags": [
+          "membres"
+        ],
+        "summary": "Membre Comptes Externes",
+        "operationId": "membre_comptes_externes_membres__membre_id__comptes_externes_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "membre_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Membre Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/membres/{membre_id}/mouvements-externes": {
+      "get": {
+        "tags": [
+          "membres"
+        ],
+        "summary": "Membre Mouvements Externes",
+        "operationId": "membre_mouvements_externes_membres__membre_id__mouvements_externes_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "membre_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Membre Id"
+            }
+          },
+          {
+            "name": "institution_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Institution Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 30,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageMouvements"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/demandes": {
+      "post": {
+        "tags": [
+          "demandes"
+        ],
+        "summary": "Create Demande",
+        "operationId": "create_demande_demandes_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemandeCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemandeCreateOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "demandes"
+        ],
+        "summary": "List Demandes",
+        "operationId": "list_demandes_demandes_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "statut",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Statut"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 30,
+              "title": "Page Size"
+            }
+          },
+          {
+            "name": "membre_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Membre Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageDemandes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/demandes/{demande_id}/collecte": {
       "post": {
         "tags": [
@@ -340,6 +1104,11 @@
         ],
         "summary": "Save Collecte",
         "operationId": "save_collecte_demandes__demande_id__collecte_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "demande_id",
@@ -383,6 +1152,49 @@
             }
           }
         }
+      },
+      "get": {
+        "tags": [
+          "demandes"
+        ],
+        "summary": "Get Collecte",
+        "operationId": "get_collecte_demandes__demande_id__collecte_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "demande_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Demande Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/demandes/{demande_id}/pieces": {
@@ -392,6 +1204,11 @@
         ],
         "summary": "Add Piece",
         "operationId": "add_piece_demandes__demande_id__pieces_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "demande_id",
@@ -435,6 +1252,49 @@
             }
           }
         }
+      },
+      "get": {
+        "tags": [
+          "demandes"
+        ],
+        "summary": "Get Pieces",
+        "operationId": "get_pieces_demandes__demande_id__pieces_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "demande_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Demande Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/demandes/{demande_id}": {
@@ -444,6 +1304,11 @@
         ],
         "summary": "Get Demande",
         "operationId": "get_demande_demandes__demande_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "demande_id",
@@ -479,6 +1344,321 @@
         }
       }
     },
+    "/demandes/{demande_id}/score": {
+      "get": {
+        "tags": [
+          "workflow"
+        ],
+        "summary": "Get Score",
+        "operationId": "get_score_demandes__demande_id__score_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "demande_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Demande Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/demandes/{demande_id}/scores": {
+      "get": {
+        "tags": [
+          "workflow"
+        ],
+        "summary": "Get Score History",
+        "operationId": "get_score_history_demandes__demande_id__scores_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "demande_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Demande Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/demandes/{demande_id}/ratios": {
+      "get": {
+        "tags": [
+          "workflow"
+        ],
+        "summary": "Get Ratios",
+        "operationId": "get_ratios_demandes__demande_id__ratios_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "demande_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Demande Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/demandes/{demande_id}/tresorerie": {
+      "get": {
+        "tags": [
+          "demandes"
+        ],
+        "summary": "Get Tresorerie",
+        "operationId": "get_tresorerie_demandes__demande_id__tresorerie_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "demande_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Demande Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/demandes/{demande_id}/decisions": {
+      "get": {
+        "tags": [
+          "workflow"
+        ],
+        "summary": "Get Decisions",
+        "operationId": "get_decisions_demandes__demande_id__decisions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "demande_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Demande Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/demandes/{demande_id}/audit": {
+      "get": {
+        "tags": [
+          "workflow"
+        ],
+        "summary": "Get Audit",
+        "operationId": "get_audit_demandes__demande_id__audit_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "demande_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Demande Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/demandes/{demande_id}/cautions": {
+      "get": {
+        "tags": [
+          "demandes"
+        ],
+        "summary": "Get Cautions",
+        "operationId": "get_cautions_demandes__demande_id__cautions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "demande_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Demande Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/demandes/{demande_id}/analyser": {
       "post": {
         "tags": [
@@ -486,6 +1666,11 @@
         ],
         "summary": "Analyser",
         "operationId": "analyser_demandes__demande_id__analyser_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "demande_id",
@@ -528,6 +1713,11 @@
         ],
         "summary": "Soumettre",
         "operationId": "soumettre_demandes__demande_id__soumettre_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "demande_id",
@@ -536,16 +1726,6 @@
             "schema": {
               "type": "integer",
               "title": "Demande Id"
-            }
-          },
-          {
-            "name": "utilisateur_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "default": 1,
-              "title": "Utilisateur Id"
             }
           }
         ],
@@ -580,6 +1760,11 @@
         ],
         "summary": "Decision",
         "operationId": "decision_demandes__demande_id__decision_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "demande_id",
@@ -632,6 +1817,11 @@
         ],
         "summary": "Memo",
         "operationId": "memo_demandes__demande_id__memo_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "demande_id",
@@ -674,6 +1864,11 @@
         ],
         "summary": "Amortissement",
         "operationId": "amortissement_demandes__demande_id__amortissement_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "demande_id",
@@ -716,6 +1911,11 @@
         ],
         "summary": "File Chef",
         "operationId": "file_chef_files_chef_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "page",
@@ -772,6 +1972,11 @@
         ],
         "summary": "File Cic",
         "operationId": "file_cic_files_cic_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "page",
@@ -839,7 +2044,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/vision/recouvrement": {
@@ -860,7 +2070,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/health": {
@@ -887,6 +2102,51 @@
   },
   "components": {
     "schemas": {
+      "AgenceOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "nom": {
+            "type": "string",
+            "title": "Nom"
+          },
+          "ville": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ville"
+          },
+          "topologie": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topologie"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "nom"
+        ],
+        "title": "AgenceOut"
+      },
       "AmortissementOut": {
         "properties": {
           "montant": {
@@ -913,6 +2173,43 @@
           "lignes"
         ],
         "title": "AmortissementOut"
+      },
+      "CapabilitiesOut": {
+        "properties": {
+          "ml_scorecard": {
+            "type": "boolean",
+            "title": "Ml Scorecard",
+            "default": false
+          },
+          "anomalies": {
+            "type": "boolean",
+            "title": "Anomalies",
+            "default": false
+          },
+          "simulation": {
+            "type": "boolean",
+            "title": "Simulation",
+            "default": false
+          },
+          "early_warning": {
+            "type": "boolean",
+            "title": "Early Warning",
+            "default": false
+          },
+          "model_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Version"
+          }
+        },
+        "type": "object",
+        "title": "CapabilitiesOut"
       },
       "CollecteIn": {
         "properties": {
@@ -1060,6 +2357,39 @@
           "jours_max_retard": {
             "type": "integer",
             "title": "Jours Max Retard"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "institution": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Institution"
+          },
+          "date_octroi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Octroi"
           }
         },
         "type": "object",
@@ -1079,6 +2409,8 @@
           },
           "note": {
             "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
             "title": "Note"
           },
           "poids": {
@@ -1119,11 +2451,6 @@
               }
             ],
             "title": "Motif"
-          },
-          "utilisateur_id": {
-            "type": "integer",
-            "title": "Utilisateur Id",
-            "default": 1
           },
           "override": {
             "type": "boolean",
@@ -1281,6 +2608,17 @@
             "type": "integer",
             "title": "Membre Id"
           },
+          "produit_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Produit Id"
+          },
           "objet": {
             "type": "string",
             "title": "Objet"
@@ -1300,6 +2638,30 @@
           "situation_fiscale": {
             "type": "string",
             "title": "Situation Fiscale"
+          },
+          "membre": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Membre"
+          },
+          "produit": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Produit"
           },
           "score": {
             "anyOf": [
@@ -1334,6 +2696,62 @@
             },
             "type": "array",
             "title": "Pieces"
+          },
+          "collecte": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collecte"
+          },
+          "tresorerie": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Tresorerie"
+          },
+          "patrimoine": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patrimoine"
+          },
+          "menage": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Menage"
+          },
+          "activite": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activite"
           }
         },
         "type": "object",
@@ -1476,6 +2894,11 @@
           "service": {
             "type": "string",
             "title": "Service"
+          },
+          "database": {
+            "type": "string",
+            "title": "Database",
+            "default": "ok"
           }
         },
         "type": "object",
@@ -1525,6 +2948,45 @@
         ],
         "title": "IncidentOut"
       },
+      "InstitutionOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "nom": {
+            "type": "string",
+            "title": "Nom"
+          },
+          "ville": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ville"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "nom",
+          "type"
+        ],
+        "title": "InstitutionOut"
+      },
       "KnockoutOut": {
         "properties": {
           "code": {
@@ -1551,11 +3013,19 @@
             "examples": [
               "agent"
             ]
+          },
+          "password": {
+            "type": "string",
+            "title": "Password",
+            "examples": [
+              "demo"
+            ]
           }
         },
         "type": "object",
         "required": [
-          "login"
+          "login",
+          "password"
         ],
         "title": "LoginIn"
       },
@@ -1576,6 +3046,17 @@
           "role": {
             "type": "string",
             "title": "Role"
+          },
+          "agence_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agence Id"
           }
         },
         "type": "object",
@@ -1616,6 +3097,28 @@
             ],
             "title": "Telephone"
           },
+          "adresse": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adresse"
+          },
+          "occupation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occupation"
+          },
           "statut": {
             "type": "string",
             "title": "Statut"
@@ -1643,6 +3146,18 @@
             "type": "boolean",
             "title": "Thin File"
           },
+          "agence": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agence"
+          },
           "compte": {
             "anyOf": [
               {
@@ -1666,6 +3181,34 @@
             },
             "type": "array",
             "title": "Incidents"
+          },
+          "nb_mouvements": {
+            "type": "integer",
+            "title": "Nb Mouvements",
+            "default": 0
+          },
+          "nb_credits_passes": {
+            "type": "integer",
+            "title": "Nb Credits Passes",
+            "default": 0
+          },
+          "nb_demandes": {
+            "type": "integer",
+            "title": "Nb Demandes",
+            "default": 0
+          },
+          "nb_comptes_externes": {
+            "type": "integer",
+            "title": "Nb Comptes Externes",
+            "default": 0
+          },
+          "garanties": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Garanties"
           }
         },
         "type": "object",
@@ -1797,6 +3340,40 @@
         ],
         "title": "MemoOut"
       },
+      "MouvementOut": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "title": "Date"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "montant": {
+            "type": "number",
+            "title": "Montant"
+          },
+          "libelle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Libelle"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "type",
+          "montant"
+        ],
+        "title": "MouvementOut"
+      },
       "OkOut": {
         "properties": {
           "ok": {
@@ -1869,6 +3446,37 @@
           "total"
         ],
         "title": "PageMembres"
+      },
+      "PageMouvements": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MouvementOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "page_size",
+          "total"
+        ],
+        "title": "PageMouvements"
       },
       "ParOut": {
         "properties": {
@@ -2007,6 +3615,78 @@
         ],
         "title": "RatiosOut"
       },
+      "ReferentielsOut": {
+        "properties": {
+          "statuts_membre": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Statuts Membre"
+          },
+          "statuts_demande": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Statuts Demande"
+          },
+          "avis": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Avis"
+          },
+          "niveaux": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Niveaux"
+          },
+          "zones": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Zones"
+          },
+          "preuves": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Preuves"
+          },
+          "types_piece": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Types Piece"
+          },
+          "qualite_ocr": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Qualite Ocr"
+          }
+        },
+        "type": "object",
+        "required": [
+          "statuts_membre",
+          "statuts_demande",
+          "avis",
+          "niveaux",
+          "zones",
+          "preuves",
+          "types_piece",
+          "qualite_ocr"
+        ],
+        "title": "ReferentielsOut"
+      },
       "ScoreBloc": {
         "properties": {
           "score_global": {
@@ -2121,6 +3801,8 @@
           },
           "score_global": {
             "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
             "title": "Score Global"
           },
           "criteres": {
@@ -2215,6 +3897,28 @@
         ],
         "title": "SoumettreOut"
       },
+      "TokenOut": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "user": {
+            "$ref": "#/components/schemas/LoginOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "user"
+        ],
+        "title": "TokenOut"
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -2306,16 +4010,26 @@
         ],
         "title": "VisionRecouvrementOut"
       }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
     }
   },
   "tags": [
     {
       "name": "sante",
-      "description": "Liveness de l'API."
+      "description": "Liveness + capabilities ML (stub)."
+    },
+    {
+      "name": "referentiel",
+      "description": "Agences, autres IF (pas mobile money), enums."
     },
     {
       "name": "auth",
-      "description": "Login démo (agent / chef / cic). Pas de JWT."
+      "description": "Login demo agent / chef / cic + JWT."
     },
     {
       "name": "membres",

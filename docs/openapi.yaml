@@ -1,81 +1,104 @@
-# Aperçu. Source de vérité : docs/openapi.json (python backend/scripts/export_openapi.py) ou GET /openapi.json.
+# Aperçu — ne pas utiliser comme contrat.
+# Source de vérité : docs/openapi.json
+#   python backend/scripts/export_openapi.py
+# Live : GET http://localhost:8000/openapi.json  ·  Swagger http://localhost:8000/docs
+# FastAPI 0.3.0 : login + password, Bearer, /capabilities, /pieces.
+#
+# Ce fichier liste les paths. Les schémas complets sont dans openapi.json.
+
 openapi: 3.1.0
 info:
   title: DigiScore-WA API
-  version: 0.2.0
-  description: Copilote d'éligibilité et de plafond — contrat Front ↔ Back.
+  version: 0.3.0
+  description: >
+    Copilote d'éligibilité et de plafond. Contrat Front ↔ Back = openapi.json
+    ou GET /openapi.json. Auth démo : POST /auth/login { login, password }
+    puis Authorization Bearer. Listes paginées : { items, page, page_size, total }.
 servers:
   - url: http://localhost:8000
 paths:
   /health:
     get:
-      summary: Santé
-      responses:
-        "200":
-          description: OK
+      summary: Santé + ping BDD
+  /capabilities:
+    get:
+      summary: Flags ML (stub, tout false)
   /auth/login:
     post:
-      summary: Login démo (agent | chef | cic)
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [login]
-              properties:
-                login: { type: string, example: agent }
-  /membres:
+      summary: Login démo agent | chef | cic + mot de passe
+  /agences:
     get:
-      summary: Recherche membre indexée
-      parameters:
-        - in: query
-          name: q
-          schema: { type: string }
-  /membres/{membre_id}:
+      summary: Agences (code, nom, ville, topologie)
+  /institutions:
     get:
-      summary: Fiche membre + résumé historique
-  /membres/{membre_id}/historique:
+      summary: Autres IF coopec/banque/IMF (pas mobile money)
+  /referentiels:
     get:
-      summary: Historique institutionnel
+      summary: Enums métier
+  /moi:
+    get:
+      summary: User JWT (même payload que le login)
   /produits:
     get:
-      summary: Produits crédit
+      summary: Catalogue produits crédit
+  /membres:
+    get:
+      summary: Recherche paginée (enveloppe .items)
+  /membres/{membre_id}:
+    get:
+      summary: Fiche membre (agence, totaux, nb_comptes_externes)
+  /membres/{membre_id}/historique:
+    get:
+      summary: Crédits, incidents, 30 mvts agence (pas un alias)
+  /membres/{membre_id}/mouvements:
+    get:
+      summary: Livre agence paginé
+  /membres/{membre_id}/comptes-externes:
+    get:
+      summary: Comptes ailleurs
+  /membres/{membre_id}/mouvements-externes:
+    get:
+      summary: Relevé ailleurs paginé
   /demandes:
     get:
-      summary: Liste des demandes
-      parameters:
-        - in: query
-          name: statut
-          schema: { type: string }
+      summary: Liste paginée
     post:
-      summary: Créer une demande liée à un membre
+      summary: Créer une demande
   /demandes/{demande_id}:
     get:
-      summary: Demande + score + ratios + décisions
+      summary: Dossier + collecte A–E + trésorerie + score
+  /demandes/{demande_id}/scores:
+    get:
+      summary: Historique score_result_history
   /demandes/{demande_id}/collecte:
+    get:
+      summary: Collecte + trésorerie + patrimoine
     post:
-      summary: Saisie financière A–E
+      summary: Saisie A–E
+  /demandes/{demande_id}/pieces:
+    post:
+      summary: Pièces / OCR
   /demandes/{demande_id}/analyser:
     post:
-      summary: Pipeline scoring + persistance
+      summary: scoring.run + persist
   /demandes/{demande_id}/soumettre:
     post:
-      summary: Soumettre au chef ou au CIC
+      summary: Soumettre (identité JWT)
   /demandes/{demande_id}/decision:
     post:
-      summary: Avis chef / CIC (motif si override)
+      summary: Avis chef / CIC
   /demandes/{demande_id}/memo:
     get:
-      summary: Mémo de crédit
+      summary: Mémo
   /demandes/{demande_id}/amortissement:
     get:
-      summary: Tableau d'amortissement sur montant retenu
+      summary: Échéancier sur montant éligible
   /files/chef:
     get:
-      summary: File chef d'agence
+      summary: File chef (paginée)
   /files/cic:
     get:
-      summary: File CIC
+      summary: File CIC (paginée)
   /vision/portefeuille:
     get:
       summary: Maquette M6

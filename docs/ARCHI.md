@@ -68,19 +68,21 @@ docker compose up -d
 # Reset : docker compose down -v
 ```
 
-1. `postgres` healthy → init `schema.sql` + `02_metier.sql` (MEM-001…012).
-2. `db-seed` (one-shot) : génère `data/synthetic/volume/*.csv` s’ils manquent, puis COPY de **toutes** les tables liées. Marqueur `seed_meta.volume_loaded` (pas de reload à chaque `up`).
-3. Les ~72 Mo de CSV **ne se commitent pas** (gitignore). Un `git clone` les régénère au premier `up`.
+1. `postgres` healthy → init `schema.sql` + `02_metier.sql` (MEM-001…012) + `03_auth_alter` + `04_data_alter`.
+2. `db-seed` (one-shot) : génère CSV **v2** (histoires uniques, mix thin / ailleurs) s’ils manquent, puis COPY. Marqueur `seed_meta.volume_loaded=v2`. Volume v1 : **`docker compose down -v`** puis `up` (pas un skip silencieux).
+3. Les CSV **ne se commitent pas**. Un `git clone` les régénère au premier `up`. Laptop : `VOLUME_MEMBERS=5000`.
 
 L’API reste `uvicorn` local. `.env` : `DATABASE_URL`, `VITE_API_URL` — voir [../.env.example](../.env.example).
 
-Swagger : http://localhost:8000/docs · collection : [postman/README.md](postman/README.md).
+Swagger : http://localhost:8000/docs · contrat figé : [openapi.json](openapi.json) (pas le yaml) · collection : [postman/README.md](postman/README.md). Notes : [SYNTHESE_RESPONSABLE_FRONTEND.md](SYNTHESE_RESPONSABLE_FRONTEND.md) · [SYNTHESE_RESPONSABLE_SCORING.md](SYNTHESE_RESPONSABLE_SCORING.md).
 
 ## IN / OUT 72 h
 
-**IN** : M1–M5 (lookup, collecte, score + plafond, mémo, files 3 rôles), 12 profils démo, sidecar documenté, volumétrie optionnelle, maquettes M6/M7.
+**IN** : M1–M5, 12 profils démo, sidecar documenté, volumétrie optionnelle, maquettes M6/M7, **auth démo 3 rôles** (login + mot de passe + JWT) pour simuler Agent → Chef → CIC.
 
-**OUT** : core banking / BIC / Flooz live, ML, M6/M7 temps réel, JWT / SSO, i18n éwé, backend dans Compose.
+**OUT** : core banking / BIC / Flooz live, ML décisionnel, M6/M7 temps réel, **SSO institutionnel**, **HMAC SI** (spec seulement), i18n éwé, backend dans Compose.
+
+Sécu des échanges **si retenus** : [SECURITE_ECHANGES_PILOTE.md](SECURITE_ECHANGES_PILOTE.md). DigiScore **ne remplace pas** le SI.
 
 ## Ce que tu ne touches pas
 

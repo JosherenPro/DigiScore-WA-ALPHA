@@ -2,7 +2,8 @@
 
 > **Usage** : coller ce fichier **en entier** à l’agent de code du collègue frontend (Cursor, Copilot, etc.).  
 > En cas de conflit : **ce prompt + l’OpenAPI live** (`http://localhost:8000/docs`) priment.  
-> Ne pas inventer de produit « néobanque », de JWT, ni de formules de score.
+> Ne pas inventer de produit « néobanque », de SSO / HMAC, ni de formules de score.  
+> Le JWT démo 3 rôles **est** le contrat. Note courte : [SYNTHESE_RESPONSABLE_FRONTEND.md](SYNTHESE_RESPONSABLE_FRONTEND.md).
 
 Tu es l’agent qui implémente / termine la **PWA React** du repo `digiscore_wa`.  
 Tu travailles **uniquement** dans `frontend/`. Tu ne modifies pas `backend/`, `scoring/`, `backend/db/`, ni Docker.
@@ -71,19 +72,25 @@ cd frontend && npm install && npm run dev
 
 Fichier env front : `frontend/.env` avec `VITE_API_URL=http://localhost:8000`.
 
-### 1.3 Login démo (pas de mot de passe, pas de JWT)
+### 1.3 Login démo (mot de passe + JWT)
 
-`POST /auth/login` body `{ "login": "agent" }` (ou `chef`, `cic`).
+`POST /auth/login` body `{ "login": "agent", "password": "demo" }` (ou `chef`, `cic`).
 
-Réponse : `{ "id", "login", "nom", "role" }`.
+Réponse : `{ "access_token", "token_type": "bearer", "user": { id, login, nom, role, agence_id } }`.
 
-| Bouton écran | `login` envoyé | `role` renvoyé | Accueil |
-|--------------|----------------|----------------|---------|
+**Tous les autres appels** : header `Authorization: Bearer <access_token>`.
+
+Sans token → **401**. Un agent qui appelle `/files/cic` → **403**.
+
+| Bouton écran | `login` | `role` | Accueil |
+|--------------|---------|--------|---------|
 | Agent de crédit | `agent` | `agent` | `/agent` |
 | Chef d’agence | `chef` | `chef_agence` | `/chef` |
 | CIC | `cic` | `cic` | `/cic` |
 
-Session actuelle : `sessionStorage` via `frontend/src/auth.ts`. **Garde ce modèle.** Pas de SSO.
+Session : stocke **le token** (et le user) — plus seulement `id` en sessionStorage. Toujours pas de SSO.
+
+**Pagination (P0)** : `GET /membres`, `/demandes`, `/files/chef`, `/files/cic`, **`/membres/{id}/mouvements`**, **`/mouvements-externes`** renvoient `{ items, page, page_size, total }`. Itère sur **`.items`**, jamais sur la racine.
 
 ### 1.4 Les 12 users de démo (pitch)
 
@@ -177,7 +184,7 @@ L’API ne renvoie **plus** un tableau. Le client `frontend/src/api/client.ts` a
 { "items": [ ... ], "page": 1, "page_size": 30, "total": 120012 }
 ```
 
-Concerne : `GET /membres`, `GET /demandes`, `GET /files/chef`, `GET /files/cic`.
+Concerne : `GET /membres`, `GET /demandes`, `GET /files/chef`, `GET /files/cic`, `GET /membres/{id}/mouvements`, `GET /membres/{id}/mouvements-externes`.
 
 - Query : `q`, `page`, `page_size` (max **100**).  
 - `q` cherche code membre, nom, prénom, **numéro de compte**.  
@@ -197,7 +204,7 @@ api.membres = (q: string, page = 1, pageSize = 30) =>
 1. Recalculer CAF, RCSD, EBE, score, plafond dans le front. Tu **affiches** `ratios` et `score` renvoyés.  
 2. Créer de nouveaux endpoints ou changer les URLs.  
 3. Modifier `scoring/`, `schema.sql`, les seeds, Docker.  
-4. Ajouter JWT / OAuth / i18n éwé.  
+4. Ajouter OAuth / SSO / i18n éwé (le JWT démo 3 rôles **est** le contrat).  
 5. Brancher un autre host que `VITE_API_URL`.  
 6. Mapper les écrans sur les noms de tables SQL.  
 7. Faire un dashboard analytics générique à la place du parcours crédit.  
@@ -264,16 +271,21 @@ Fais-le **dans cet ordre**. Chaque étape doit marcher avec l’API réelle avan
 - Pagination (`page` / `total`).  
 - Clic → `/membres/:id`.
 
-### Étape C — Fiche + historique
+### Étape C — Fiche + historique (deux cahiers)
 
-`GET /membres/{id}` (l’historique est le même objet).
+`GET /membres/{id}` = identité, agence, compte **local**, totaux, `thin_file`, `nb_comptes_externes`.
+
+`GET /membres/{id}/historique` **n’est plus un alias** : crédits (`source` + nom d’institution), incidents, **30 derniers mouvements d’agence**, totaux. Liste paginée : `GET /membres/{id}/mouvements?page=`.
+
+Ailleurs (autre COOPEC / banque / IMF, **pas** Flooz) : `GET /membres/{id}/comptes-externes` et `/mouvements-externes`. **Ne fusionne pas** les deux livres (le solde agence serait faux).
 
 Afficher :
 
-- Identité, téléphone, zone, ancienneté, `thin_file` (bandeau si vrai).  
-- Compte : numéro, statut, solde, épargne moy. 6 mois.  
-- Crédits passés (montant, statut, retards).  
+- Identité, téléphone, zone, ancienneté, `thin_file` (bandeau si vrai), libellé d’agence (`GET /agences` ou champ `agence` de la fiche).
+- Compte **ici** : numéro, statut, solde, épargne moy. 6 mois, mouvements.
+- Crédits passés (montant, statut, retards, source / institution).
 - Incidents.
+- Si `nb_comptes_externes` > 0 : bloc « ailleurs » séparé (MEM-012 = BTCI).
 
 Bouton **Nouvelle demande** **seulement si** `statut === "actif"` **et** `compte.statut === "actif"`.  
 Sinon : texte « Compte inactif / gelé — demande impossible » (cas MEM-010).
@@ -330,12 +342,12 @@ Mise en page imprimable simple (pas besoin de PDF réel).
 `GET /files/chef?page=`  
 Pour chaque ligne : ouvrir le dossier. Actions :
 
-- Valider → `{ niveau: "chef_agence", avis: "valider", utilisateur_id }`  
+- Valider → `{ niveau: "chef_agence", avis: "valider" }`  
 - Refuser → `avis: "refuser"` + motif  
 - Renvoyer → `avis: "renvoyer"` + motif  
 - Escalader CIC → `avis: "escalader"`
 
-`utilisateur_id` = `getUser().id`.
+Identité = Bearer (plus de `utilisateur_id` dans le body).
 
 ### Étape H — File CIC
 
@@ -357,15 +369,19 @@ Pas de graphiques complexes. Tableaux suffisent.
 | Choisir un rôle | `POST /auth/login` |
 | Chercher un membre | `GET /membres?q=&page=&page_size=` |
 | Ouvrir la fiche | `GET /membres/{id}` |
+| Historique / mvts agence | `GET /membres/{id}/historique` · `/mouvements` |
+| Comptes ailleurs | `GET /membres/{id}/comptes-externes` · `/mouvements-externes` |
+| Agences / IF / moi | `GET /agences` · `/institutions` · `/referentiels` · `/moi` |
 | Liste produits | `GET /produits` |
+| Revoir le dossier | `GET /demandes/{id}` (collecte A–E + trésorerie + score) |
+| Historique scores | `GET /demandes/{id}/scores` |
 | Créer le dossier | `POST /demandes` |
 | Sauver la collecte | `POST /demandes/{id}/collecte` |
 | Ajouter une pièce | `POST /demandes/{id}/pieces` |
 | Lancer le score | `POST /demandes/{id}/analyser` |
-| Revoir le dossier | `GET /demandes/{id}` |
 | Mémo | `GET /demandes/{id}/memo` |
 | Échéancier | `GET /demandes/{id}/amortissement` |
-| Envoyer en file | `POST /demandes/{id}/soumettre?utilisateur_id=` |
+| Envoyer en file | `POST /demandes/{id}/soumettre` |
 | File chef / CIC | `GET /files/chef` · `GET /files/cic` |
 | Trancher | `POST /demandes/{id}/decision` |
 | M6 / M7 | `GET /vision/portefeuille` · `/vision/recouvrement` |
