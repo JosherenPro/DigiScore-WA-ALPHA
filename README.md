@@ -60,6 +60,7 @@ Logins démo : `agent` · `chef` · `cic`.
 | [docs/ARCHI.md](docs/ARCHI.md) | Tous — sidecar, ports, flux, IN/OUT |
 | [docs/GUIDE_SCORING.md](docs/GUIDE_SCORING.md) | Moteur — contrat `DossierInput` / `ScoreResult`, pas de SQL |
 | [docs/GUIDE_FRONTEND.md](docs/GUIDE_FRONTEND.md) | UI — clés JSON, pagination, pages → endpoints |
+| [docs/PROMPT_AGENT_FRONTEND.md](docs/PROMPT_AGENT_FRONTEND.md) | Brief à coller dans l’agent IA du front |
 | [docs/postman/README.md](docs/postman/README.md) | Smoke Swagger / Postman |
 
 ## Plan H0–H72

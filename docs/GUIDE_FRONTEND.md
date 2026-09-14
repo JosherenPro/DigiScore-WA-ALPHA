@@ -1,5 +1,7 @@
 # Guide frontend — DigiScore-WA
 
+**Brief agent IA (A→Z, à coller tel quel)** : [PROMPT_AGENT_FRONTEND.md](PROMPT_AGENT_FRONTEND.md).
+
 Tu consommes **uniquement** l’API JSON. Les formules (CAF, RCSD, EBE, score /100, plafond) sont calculées par le package `scoring` via le back. **Interdit** de les recoder dans React.
 
 ## Lancer
