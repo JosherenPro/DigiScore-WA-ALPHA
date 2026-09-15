@@ -11,6 +11,7 @@ import {
 } from "../api/client";
 import Spinner from "./Spinner";
 import Alert from "./Alert";
+import MlSection from "./MlSection";
 import { CompareBar, FactorsChart, TrajectoryChart } from "./charts";
 
 const SCENARIOS = [
@@ -121,9 +122,13 @@ export default function MlPanel({
   if (!caps) return null;
   if (!caps.ml_scorecard && !caps.anomalies && !caps.simulation) return null;
 
+  // Résumé lisible replié : le niveau de risque suffit à décider s'il faut ouvrir.
+  const resume = scorecard
+    ? `risque ${scorecard.niveau_risque} · défaut estimé ${Math.round(scorecard.probabilite_defaut * 100)} %`
+    : "scorecard adaptative, anomalies, simulation de résilience";
+
   return (
-    <section className="block ml mt-md">
-      <span className="ml-tag">Éclairage ML — consultatif, jamais décisionnel</span>
+    <MlSection titre="Éclairages sur ce dossier" resume={resume} className="mt-md">
 
       {caps.ml_scorecard && scorecard && (
         <div className="ml-block">
@@ -269,6 +274,6 @@ export default function MlPanel({
           )}
         </div>
       )}
-    </section>
+    </MlSection>
   );
 }

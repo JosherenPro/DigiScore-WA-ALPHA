@@ -394,6 +394,9 @@ class Decision(Base):
     reason = mapped_column(Text)
     is_override = mapped_column(Boolean, default=False)
     user_id = mapped_column(Integer)
+    decided_at = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC), server_default=func.now()
+    )
 
 
 class AuditLog(Base):
@@ -403,6 +406,12 @@ class AuditLog(Base):
     user_id = mapped_column(Integer)
     action = mapped_column(String)
     detail = mapped_column(Text)
+    # Trace BCEAO : qui, quoi, quand. La colonne existait deja en base
+    # (schema.sql) mais n'etait pas mappee, donc l'API rendait une piste
+    # d'audit sans auteur ni horodatage — inexploitable pour un controle.
+    logged_at = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC), server_default=func.now()
+    )
 
 
 class FinancialRatio(Base):

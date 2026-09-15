@@ -12,19 +12,20 @@ INSERT INTO financial_institution (code, name, city, kind) VALUES
     ('IF-WAGES', 'WAGES', 'Lome', 'microfinance');
 
 INSERT INTO credit_product (code, label, min_amount, max_amount, max_term_months, indicative_rate, guarantor_threshold, min_guarantors, is_exceptional) VALUES
-    ('COM-STD', 'Credit commerce standard', 50000, 3000000, 18, 0.018, 2000000, 1, FALSE),
-    ('AGR-SAI', 'Credit agricole saisonnier', 100000, 2500000, 12, 0.016, 2000000, 1, FALSE),
-    ('EXC-10M', 'Credit exceptionnel CIC', 5000000, 12000000, 36, 0.015, 2000000, 2, TRUE);
+    ('PME-PMI', 'Crédit PME/PMI', 100000, 5000000, 24, 0.018, 2000000, 1, FALSE),
+    ('SYSCOFOP', 'Crédit SYSCOFOP', 50000, 2000000, 12, 0.016, 2000000, 1, FALSE),
+    ('VIR-SAL', 'Crédit virement salaire', 50000, 3000000, 18, 0.015, 2000000, 1, FALSE),
+    ('EXC-10M', 'Crédit exceptionnel CIC', 5000000, 12000000, 36, 0.015, 2000000, 2, TRUE);
 
 -- Plusieurs agents par agence (pas juste 'agent'/id=1) : sans ca, "mes dossiers"
 -- et "base complete" affichent toujours le meme total sur la page Dossiers, vu
 -- que credit_application.agent_id etait fige a 1 pour tout le monde. Ces comptes
--- ne sont pas connectables depuis l'ecran de connexion (ROLES n'a que agent/chef/cic)
+-- ne sont pas connectables depuis l'ecran de connexion (ROLES n'a que agent/direct/cic)
 -- : ce sont uniquement des proprietaires de dossiers pour la repartition du volume.
 INSERT INTO app_user (login, full_name, role, agency_id, password_hash) VALUES
-    ('agent', 'Ama Agent', 'agent', 1, '$2b$12$9OfpiTAhhmsHN9nRwDdFLOf7DiSl.eSp0MhZBA0Iu8Ypca.jMW1iC'),
-    ('chef', 'Koffi Chef', 'chef_agence', 1, '$2b$12$9OfpiTAhhmsHN9nRwDdFLOf7DiSl.eSp0MhZBA0Iu8Ypca.jMW1iC'),
-    ('cic', 'Comite CIC', 'cic', 1, '$2b$12$9OfpiTAhhmsHN9nRwDdFLOf7DiSl.eSp0MhZBA0Iu8Ypca.jMW1iC'),
+    ('agent', 'Ama Agent', 'agent', 1, '$2b$12$UAiMHdUPGagWNb96IlnlAOLVALfthuWjmV.Zps6Y3tFfDmP/YWC4q'),
+    ('direct', 'Koffi Directeur', 'chef_agence', 1, '$2b$12$GNE/ytFWA6D2cXwAoQgJyuPPCZgc97UE6ryIJjSPHkrMbUB3J88Sy'),
+    ('cic', 'Comite CIC', 'cic', 1, '$2b$12$pT0nytgemrYjKRsMcgpYA.moFRG5eYY0SuHpGMh63.4I3lWm6f30S'),
     ('agent2', 'Yawa Sena', 'agent', 1, '$2b$12$9OfpiTAhhmsHN9nRwDdFLOf7DiSl.eSp0MhZBA0Iu8Ypca.jMW1iC'),
     ('agent3', 'Kokou Amewou', 'agent', 2, '$2b$12$9OfpiTAhhmsHN9nRwDdFLOf7DiSl.eSp0MhZBA0Iu8Ypca.jMW1iC'),
     ('agent4', 'Afi Dogbe', 'agent', 2, '$2b$12$9OfpiTAhhmsHN9nRwDdFLOf7DiSl.eSp0MhZBA0Iu8Ypca.jMW1iC');
@@ -171,7 +172,7 @@ INSERT INTO credit_application (member_id, product_id, agent_id, agency_id, purp
     (6,  2, 1, 2, 'Intrants campagne', 600000, 10, 'brouillon', 'en_regle', FALSE, TRUE, FALSE),
     (7,  1, 1, 1, 'Fonds de roulement', 450000, 12, 'brouillon', 'en_regle', FALSE, TRUE, FALSE),
     (8,  1, 1, 1, 'Stock trop lourd vs CAF', 800000, 12, 'brouillon', 'en_regle', FALSE, TRUE, FALSE),
-    (9,  3, 1, 1, 'Extension entrepot (exceptionnel)', 10000000, 24, 'brouillon', 'en_regle', FALSE, TRUE, FALSE),
+    (9,  4, 1, 1, 'Extension entrepot (exceptionnel)', 10000000, 24, 'brouillon', 'en_regle', FALSE, TRUE, FALSE),
     (11, 1, 1, 1, 'Dossier override demo', 400000, 10, 'soumis_chef', 'en_regle', FALSE, TRUE, FALSE),
     (12, 1, 1, 1, 'Credit avec preuves externes', 350000, 10, 'brouillon', 'en_regle', TRUE, TRUE, FALSE);
 
@@ -209,17 +210,17 @@ INSERT INTO wealth (application_id, productive_assets, non_productive_assets, fo
     (11, 250000, 80000, 80000, 20000, FALSE, FALSE, FALSE, FALSE, FALSE);
 
 INSERT INTO activity (application_id, activity_type, description, seniority_months, location_area, is_seasonal, proof_level) VALUES
-    (1, 'commerce', 'Boutique vivres', 60, 'Lome', FALSE, 'N3'),
-    (2, 'commerce', 'Tissus', 48, 'Lome', FALSE, 'N2'),
-    (3, 'services', 'Moto-taxi + petit commerce', 24, 'Lome', FALSE, 'N1'),
-    (4, 'commerce', 'Tablette rue', 8, 'Lome', FALSE, 'N1'),
-    (5, 'services', 'Atelier menuiserie', 96, 'Agoe', FALSE, 'N2'),
-    (6, 'agriculture', 'Mais / soja', 40, 'Kpalime', TRUE, 'N2'),
-    (7, 'commerce', 'Quincaillerie', 30, 'Lome', FALSE, 'N2'),
-    (8, 'commerce', 'Alimentation', 18, 'Lome', FALSE, 'N1'),
-    (9, 'commerce', 'Grossiste cereales', 120, 'Lome', FALSE, 'N3'),
-    (10, 'commerce', 'Pieces auto', 40, 'Lome', FALSE, 'N2'),
-    (11, 'services', 'Couture', 10, 'Lome', FALSE, 'N2');
+    (1, 'tertiaire', 'Boutique vivres', 60, 'Lome', FALSE, 'N3'),
+    (2, 'tertiaire', 'Tissus', 48, 'Lome', FALSE, 'N2'),
+    (3, 'tertiaire', 'Moto-taxi + petit commerce', 24, 'Lome', FALSE, 'N1'),
+    (4, 'tertiaire', 'Tablette rue', 8, 'Lome', FALSE, 'N1'),
+    (5, 'secondaire', 'Atelier menuiserie', 96, 'Agoe', FALSE, 'N2'),
+    (6, 'primaire', 'Mais / soja', 40, 'Kpalime', TRUE, 'N2'),
+    (7, 'tertiaire', 'Quincaillerie', 30, 'Lome', FALSE, 'N2'),
+    (8, 'tertiaire', 'Alimentation', 18, 'Lome', FALSE, 'N1'),
+    (9, 'tertiaire', 'Grossiste cereales', 120, 'Lome', FALSE, 'N3'),
+    (10, 'tertiaire', 'Pieces auto', 40, 'Lome', FALSE, 'N2'),
+    (11, 'secondaire', 'Couture', 10, 'Lome', FALSE, 'N2');
 
 INSERT INTO household (application_id, household_size, housing, dependents) VALUES
     (1, 5, 'locataire', 3), (2, 4, 'locataire', 2), (3, 3, 'locataire', 1),

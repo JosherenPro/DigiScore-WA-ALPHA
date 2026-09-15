@@ -48,6 +48,25 @@ STREETS = ["rue du Marche", "av. de la Paix", "rue des Cocotiers", "quartier Gbo
 MVT_LABELS = ("Depot epargne", "Retrait caisse", "Interet compte", "Depot campagne", "Retrait urgence")
 
 
+# Codes de la grille de signaux FUCEC (portfolio_service.SIGNAUX_FUCEC). Le
+# generateur ecrivait f"Signal {code}", qui ne faisait que repeter le code du
+# membre : la colonne n'apportait aucune information exploitable, ni pour
+# l'agent ni pour l'early warning qui la relaie.
+SIGNAUX_SEED = (
+    "ACT_BAISSE_STOCK",
+    "ACT_CHANGEMENT",
+    "ACT_FERMETURE",
+    "ACT_PERTE_CLIENT",
+    "COM_EVITEMENT",
+    "COM_PROMESSE_NON_TENUE",
+    "COM_AGRESSIVITE",
+    "COM_REECHELONNEMENT",
+    "ENV_SINISTRE",
+    "ENV_CRISE_SECTEUR",
+    "ENV_SANTE",
+    "ENV_SURENDETTEMENT",
+)
+
 def unique_identity(i: int) -> tuple[str, str, str]:
     idx = i - 1
     n_first = len(_FIRST_A) * len(_FIRST_B)
@@ -309,7 +328,11 @@ def generate(out: Path, n: int, n_apps: int) -> dict[str, Path]:
                 w["credit"].writerow([code, r"\N", amt, rng.choice([6, 8, 10, 12]), dstr(granted), closed, st, late, late * 8, "interne"])
                 n_cred += 1
                 if st in ("en_cours", "impaye"):
-                    days_late = late * 8 if st == "impaye" else 0
+                    # Retard etale jour par jour : un pas de 8 jours collait
+                    # des milliers d'encours sur 5 valeurs, et tout indicateur
+                    # derive du retard ressortait identique pour tout le monde.
+                    days_late = rng.randint(late * 8 - 7, late * 8 + 7) if st == "impaye" else 0
+                    days_late = max(1, days_late)
                     disb = granted
                     due = disb + timedelta(days=30 * 12)
                     w["loan"].writerow([code, amt, max(20_000, amt // 3), days_late, st, dstr(disb), dstr(due), dstr(ANCHOR)])
@@ -317,7 +340,7 @@ def generate(out: Path, n: int, n_apps: int) -> dict[str, Path]:
         if profile == "late":
             w["inc"].writerow([code, "retard", dstr(ANCHOR - timedelta(days=10 + i % 70)), "grave", f"Retard dossier {code}"])
             n_inc += 1
-            w["follow"].writerow([code, rng.choice(["V1", "V2", "V3"]), dstr(ANCHOR - timedelta(days=1 + i % 40)), 15 + (i % 40), f"Signal {code}"])
+            w["follow"].writerow([code, rng.choice(["V1", "V2", "V3"]), dstr(ANCHOR - timedelta(days=1 + i % 40)), 15 + (i % 40), rng.choice(SIGNAUX_SEED)])
             w["rec"].writerow([code, 1 + (i % 4), f"Relance {code}", f"Agent-{1 + i % 9}", dstr(ANCHOR - timedelta(days=20 + i % 10))])
         elif rng.random() < 0.02:
             w["inc"].writerow([code, "retard", dstr(ANCHOR - timedelta(days=20 + i % 180)), "moyenne", f"Retard leger {code}"])

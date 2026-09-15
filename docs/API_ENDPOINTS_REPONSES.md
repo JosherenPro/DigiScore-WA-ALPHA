@@ -5,7 +5,7 @@
 **Conventions**
 
 - **Auth** : header `Authorization: Bearer <token>` (token de `POST /auth/login`). Sans token → `401`.
-- **Logins démo** : `agent` / `chef` / `cic`, mot de passe `demo`.
+- **Logins démo** : `agent` / `direct` / `cic` — mots de passe `agent`, `direct`, `cic`.
 - **Pagination** : les listes sont `{ items, page, page_size, total }` — itérer sur `.items` (page_size max 100).
 - **Clés en français** : l'API parle FR (`code_externe`, `montant_demande`, `message_humain`…), pas les colonnes SQL EN.
 - **Statuts demande** : `brouillon`, `analyse`, `soumis_chef`, `renvoye`, `soumis_cic`, `accorde`, `conditionne`, `refuse`, `clos`.
@@ -74,7 +74,7 @@
 ```json
 {
   "login": "agent",
-  "password": "demo"
+  "password": "agent"
 }
 ```
 

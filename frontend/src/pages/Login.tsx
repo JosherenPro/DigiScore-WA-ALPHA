@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { getUser, homeFor, setSession } from "../auth";
 import Alert from "../components/Alert";
 
-// Démo/pilote : les 3 comptes partagent le même mot de passe (voir README).
+// Démo/pilote : un clic par profil, mot de passe = identifiant (voir README).
 // Choisir un profil suffit à entrer — pas de formulaire à remplir. Design
 // repris de la maquette Figma fournie par l'utilisateur (fond vert texturé,
 // carte ivoire, bandeau kente, badges terracotta) — la mécanique reste la
 // même, un clic, aucun code PIN réel à saisir.
-const DEMO_PASSWORD = "demo";
+const DEMO_PASSWORDS: Record<string, string> = { agent: "agent", direct: "direct", cic: "cic" };
 
 const ROLES = [
   {
@@ -24,8 +24,8 @@ const ROLES = [
     ),
   },
   {
-    login: "chef",
-    title: "Chef d’agence",
+    login: "direct",
+    title: "Directeur (Chef d’Agence)",
     hint: "File à valider, renvoyer ou escalader au CIC",
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -69,7 +69,7 @@ export default function Login() {
     setErr("");
     setEntering(login);
     try {
-      const out = await api.login(login, DEMO_PASSWORD);
+      const out = await api.login(login, DEMO_PASSWORDS[login] ?? login);
       setSession(out.access_token, out.user);
       nav(homeFor(out.user.role));
     } catch (e) {
@@ -92,7 +92,7 @@ export default function Login() {
             </div>
           </div>
 
-          <p className="login-lede">Choisis ton profil pour entrer — démo, pas de mot de passe à saisir.</p>
+          <p className="login-lede">Choisis ton profil pour entrer — démo : agent/agent, direct/direct, cic/cic.</p>
 
           <div className="roles">
             {ROLES.map((r) => (
@@ -118,7 +118,10 @@ export default function Login() {
           {health && <Alert kind="error">{health}</Alert>}
           {err && <Alert kind="error">{err}</Alert>}
 
-          <p className="login-note">Démo — aucun mot de passe requis. Chaque interface a sa propre session.</p>
+          <p className="login-note">Démo — mot de passe = identifiant. Chaque interface a sa propre session.</p>
+          <p className="login-note">
+            <Link to="/politique">Politique d’utilisation, confidentialité et conformité</Link>
+          </p>
         </div>
       </div>
     </div>

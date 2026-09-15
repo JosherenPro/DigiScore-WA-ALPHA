@@ -94,7 +94,7 @@ class CollecteIn(BaseModel):
     preuve_revenu: str = "N1"
     preuve_charge: str = "N1"
     saisonnier: bool = False
-    type_activite: str = "commerce"
+    type_activite: str = "tertiaire"
     valeur_garanties: float = 0
 
 
@@ -108,6 +108,23 @@ class DemandeCreate(BaseModel):
     situation_fiscale: SituationFiscale = SituationFiscale.NON_FOURNI
     credits_ailleurs: bool = False
     preuves_externes_ok: bool = False
+    collecte: CollecteIn | None = None
+
+
+class DemandeUpdate(BaseModel):
+    """Correction d'une demande encore ouverte.
+
+    Tous les champs sont optionnels : `exclude_unset` permet de ne toucher que
+    ce que l'agent a reellement modifie, sans ecraser le reste par des defauts.
+    """
+
+    produit_id: int | None = None
+    objet: str | None = None
+    montant_demande: float | None = Field(default=None, gt=0, le=100_000_000)
+    duree_mois: int | None = Field(default=None, ge=1, le=60)
+    situation_fiscale: SituationFiscale | None = None
+    credits_ailleurs: bool | None = None
+    preuves_externes_ok: bool | None = None
     collecte: CollecteIn | None = None
 
 
@@ -377,6 +394,7 @@ class AmortissementOut(BaseModel):
     assurance_mensuelle: float = 0
     mensualite_totale: float = 0
     cout_total: float = 0
+    total_a_rembourser: float = 0
     lignes: list[dict]
 
 

@@ -14,8 +14,8 @@ from app.services import portfolio_service as svc
 client = TestClient(app)
 
 
-def _headers(login: str = "chef") -> dict[str, str]:
-    token = client.post("/auth/login", json={"login": login, "password": "demo"}).json()["access_token"]
+def _headers(login: str = "direct") -> dict[str, str]:
+    token = client.post("/auth/login", json={"login": login, "password": login}).json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -55,7 +55,7 @@ def test_jours_retard_fifo():
 
 
 def test_vision_portefeuille_chef_et_agent():
-    for login in ("chef", "agent"):
+    for login in ("direct", "agent"):
         r = client.get("/vision/portefeuille", headers=_headers(login))
         assert r.status_code == 200, r.text
         body = r.json()
@@ -66,7 +66,7 @@ def test_vision_portefeuille_chef_et_agent():
 
 
 def test_vision_aging_echeances_visites():
-    h = _headers("chef")
+    h = _headers("direct")
     aging = client.get("/vision/aging", headers=h)
     assert aging.status_code == 200
     buckets = aging.json()["buckets"]
@@ -82,7 +82,7 @@ def test_vision_aging_echeances_visites():
 
 
 def test_vision_recouvrement_et_signaux():
-    h = _headers("chef")
+    h = _headers("direct")
     m7 = client.get("/vision/recouvrement?limit=5", headers=h)
     assert m7.status_code == 200
     dossiers = m7.json()["dossiers"]
@@ -119,7 +119,7 @@ def test_log_visite_et_cleanup():
 
 
 def test_action_recouvrement_et_cleanup():
-    h = _headers("chef")
+    h = _headers("direct")
     dossiers = client.get("/vision/recouvrement/dossiers?page_size=1", headers=h).json()["items"]
     case_id = dossiers[0]["case_id"]
     with SessionLocal() as db:
@@ -152,7 +152,7 @@ def test_action_recouvrement_et_cleanup():
 
 
 def test_recalcul_par_snapshot():
-    h = _headers("chef")
+    h = _headers("direct")
     r = client.post("/vision/par/recalcul", headers=h)
     assert r.status_code == 200, r.text
     body = r.json()

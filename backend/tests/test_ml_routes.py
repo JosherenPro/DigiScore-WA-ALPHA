@@ -11,7 +11,7 @@ client = TestClient(app)
 
 
 def _token(login: str = "agent") -> str:
-    r = client.post("/auth/login", json={"login": login, "password": "demo"})
+    r = client.post("/auth/login", json={"login": login, "password": login})
     assert r.status_code == 200, r.text
     return r.json()["access_token"]
 
@@ -29,7 +29,7 @@ def test_ml_routes_503_quand_desactive(monkeypatch):
     assert client.get("/demandes/1/anomalies", headers=_headers()).status_code == 503
     sim = client.post("/demandes/1/simuler", headers=_headers(), json={"scenario": "normal"})
     assert sim.status_code == 503
-    assert client.get("/portefeuille/alertes", headers=_headers("chef")).status_code == 503
+    assert client.get("/portefeuille/alertes", headers=_headers("direct")).status_code == 503
     assert client.get("/demandes/1/ml/scorecard", headers=_headers()).status_code == 503
     assert client.get("/demandes/1/ml/plafond", headers=_headers()).status_code == 503
 
@@ -168,7 +168,7 @@ def test_simulation_snapshot_relisible(monkeypatch):
 
 def test_alertes_chef_ok_agent_scoped(monkeypatch):
     _enable_ml(monkeypatch)
-    r = client.get("/portefeuille/alertes?limit=5", headers=_headers("chef"))
+    r = client.get("/portefeuille/alertes?limit=5", headers=_headers("direct"))
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["model_version"] == "early-warning-v1"

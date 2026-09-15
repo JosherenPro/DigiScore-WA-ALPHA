@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.tables import CreditApplication, Member, OutstandingLoan, PortfolioFollowup
+from app.services.portfolio_service import nom_complet
 
 MODEL_VERSION = "early-warning-v1"
 MAX_SCAN = 5000
@@ -77,6 +78,8 @@ def list_alerts(
             {
                 "application_id": loan.application_id,
                 "member_code": member.external_code,
+                "member_name": nom_complet(member),
+                "member_id": member.id,
                 "p_par30_90j": _p_par30_90j(int(loan.days_late or 0), signals, loan.status),
                 "exposure": float(loan.outstanding or 0.0),
                 "days_late": int(loan.days_late or 0),
@@ -85,5 +88,12 @@ def list_alerts(
             }
         )
 
-    items.sort(key=lambda item: (item["p_par30_90j"], item["days_late"]), reverse=True)
+    # A risque egal, l'exposition departage : le score heuristique sature vite
+    # (il derive surtout de days_late), et une file ou 20 membres affichent la
+    # meme probabilite n'aide pas a choisir qui visiter en premier. Le montant
+    # en jeu, lui, varie d'un facteur 10 entre deux dossiers a retard identique.
+    items.sort(
+        key=lambda item: (item["p_par30_90j"], item["exposure"], item["days_late"]),
+        reverse=True,
+    )
     return {"model_version": MODEL_VERSION, "items": items[:limit]}

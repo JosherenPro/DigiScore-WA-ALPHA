@@ -128,6 +128,18 @@ def niveau_detail(retard: int) -> dict[str, Any] | None:
     return {"niveau": niveau, **NIVEAUX_RECOUVREMENT[niveau]}
 
 
+def nom_complet(member) -> str:
+    """Nom affichable d'un membre.
+
+    Les listes de portefeuille n'exposaient que `external_code` : un agent lit
+    « VOL-0002912 » sans savoir qui il doit appeler. Le code reste (il est
+    l'identifiant de recherche), le nom vient devant.
+    """
+    prenom = (getattr(member, "first_name", "") or "").strip()
+    nom = (getattr(member, "last_name", "") or "").strip()
+    return " ".join(p for p in (prenom, nom) if p)
+
+
 def priorite(encours: float, retard: int) -> str:
     if retard <= 0:
         return "S"
@@ -406,6 +418,7 @@ def echeances_du_jour(
                 "outstanding_loan_id": loan.id,
                 "member_id": member.id,
                 "member_code": member.external_code,
+                "member_name": nom_complet(member),
                 "outstanding": float(loan.outstanding or 0),
                 "days_late": retard,
                 "due_on": loan.due_on,
@@ -467,6 +480,7 @@ def visites_a_faire(
                 "outstanding_loan_id": loan.id,
                 "member_id": member.id,
                 "member_code": member.external_code,
+                "member_name": nom_complet(member),
                 **detail,
             }
         )

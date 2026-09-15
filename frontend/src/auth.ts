@@ -23,7 +23,8 @@ export function clearSession() {
 }
 
 export function homeFor(role: string): string {
-  if (role === "cic") return "/cic";
-  if (role === "chef_agence") return "/chef";
+  // Chef et CIC atterrissent sur leur espace de revue, pas directement dans la
+  // file : ils ont besoin de voir la charge et l'etat du risque avant de signer.
+  if (role === "cic" || role === "chef_agence") return "/revue";
   return "/dashboard";
 }

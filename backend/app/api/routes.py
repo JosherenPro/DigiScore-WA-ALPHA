@@ -67,6 +67,7 @@ from app.schemas.dossier import (
     DecisionResultOut,
     DemandeCreate,
     DemandeCreateOut,
+    DemandeUpdate,
     DemandeDetail,
     DemandeStatsOut,
     InstitutionOut,
@@ -175,7 +176,7 @@ def referentiels(_user: StaffUser):
 def login(body: LoginIn, db: Session = Depends(get_db)):
     u = db.scalars(select(AppUser).where(AppUser.login == body.login)).first()
     if not u or not verify_password(body.password, u.password_hash):
-        raise HTTPException(401, "Login ou mot de passe incorrect (agent / chef / cic + demo)")
+        raise HTTPException(401, "Login ou mot de passe incorrect (agent/agent, direct/direct, cic/cic)")
     return {"access_token": create_token(u), "token_type": "bearer", "user": _user_out(u)}
 
 
@@ -605,14 +606,30 @@ def _persist_collecte(db: Session, application_id: int, c: CollecteIn) -> None:
                 is_seasonal=c.saisonnier,
             )
         )
-    if c.valeur_garanties:
-        db.add(
-            ApplicationGuarantee(
-                application_id=application_id,
-                kind="Saisie terrain",
-                value_amount=c.valeur_garanties,
-            )
+    # Garantie saisie a la collecte : mise a jour, pas ajout. Un simple `db.add`
+    # empilait une ligne de plus a chaque enregistrement — sur un dossier repris
+    # ou corrige, la couverture (et donc la note Garanties) enflait toute seule.
+    saisie = db.scalars(
+        select(ApplicationGuarantee).where(
+            ApplicationGuarantee.application_id == application_id,
+            ApplicationGuarantee.kind == "Saisie terrain",
         )
+    ).first()
+    if c.valeur_garanties:
+        if saisie:
+            saisie.value_amount = c.valeur_garanties
+        else:
+            db.add(
+                ApplicationGuarantee(
+                    application_id=application_id,
+                    kind="Saisie terrain",
+                    value_amount=c.valeur_garanties,
+                )
+            )
+    elif saisie:
+        # Valeur remise a zero : la garantie disparait, elle ne doit pas
+        # continuer a compter dans le score.
+        db.delete(saisie)
 
 
 @router.post("/demandes", tags=["demandes"], response_model=DemandeCreateOut)
@@ -954,7 +971,15 @@ def get_demande(demande_id: int, _user: StaffUser, db: Session = Depends(get_db)
         "situation_fiscale": d.tax_status,
         "membre": None
         if not membre
-        else {"id": membre.id, "code_externe": membre.external_code, "nom": membre.last_name, "prenom": membre.first_name},
+        else {
+            "id": membre.id,
+            "code_externe": membre.external_code,
+            "nom": membre.last_name,
+            "prenom": membre.first_name,
+            # Statut du membre : l'ecran du dossier propose d'ouvrir un nouveau
+            # credit, et cette porte doit rester fermee sur un compte gele.
+            "statut": membre.status,
+        },
         "produit": None
         if not prod
         else {"id": prod.id, "code": prod.code, "libelle": prod.label, "exceptionnel": bool(prod.is_exceptional)},
@@ -1083,8 +1108,104 @@ def get_ratios(demande_id: int, _user: StaffUser, db: Session = Depends(get_db))
 
 @router.get("/demandes/{demande_id}/collecte", tags=["demandes"])
 def get_collecte(demande_id: int, user: StaffUser, db: Session = Depends(get_db)):
+    """Collecte economique complete, au format attendu par POST /collecte.
+
+    Le bloc `collecte` de la fiche dossier n'expose qu'un extrait (compte de
+    resultat). Pour reprendre un dossier la ou il en etait, il faut rendre
+    aussi le bilan, l'activite et la garantie saisie — sinon toute correction
+    repartirait de champs vides et ecraserait des donnees valides par des zeros.
+    """
+    if not db.get(CreditApplication, demande_id):
+        raise HTTPException(404, "Demande introuvable")
+    ie = db.scalars(select(IncomeExpense).where(IncomeExpense.application_id == demande_id)).first()
+    act = db.scalars(select(Activity).where(Activity.application_id == demande_id)).first()
+    saisie = db.scalars(
+        select(ApplicationGuarantee).where(
+            ApplicationGuarantee.application_id == demande_id,
+            ApplicationGuarantee.kind == "Saisie terrain",
+        )
+    ).first()
     body = get_demande(demande_id, user, db)
-    return {"collecte": body.get("collecte"), "tresorerie": body.get("tresorerie"), "patrimoine": body.get("patrimoine")}
+    complete = {
+        "ca": float(ie.revenue or 0) if ie else 0.0,
+        "cmv": float(ie.cogs or 0) if ie else 0.0,
+        "charges_exploitation": float(ie.operating_costs or 0) if ie else 0.0,
+        "produits_financiers": float(ie.financial_income or 0) if ie else 0.0,
+        "revenu_perso": float(ie.personal_income or 0) if ie else 0.0,
+        "charge_familiale": float(ie.family_cost or 0) if ie else 0.0,
+        "charge_credits_en_cours": float(ie.existing_debt_service or 0) if ie else 0.0,
+        "fonds_propres": float(ie.equity or 0) if ie else 0.0,
+        "total_dettes": float(ie.total_debt or 0) if ie else 0.0,
+        "actif_total": float(ie.total_assets or 0) if ie else 0.0,
+        "actif_circulant": float(ie.current_assets or 0) if ie else 0.0,
+        "passif_circulant": float(ie.current_liabilities or 0) if ie else 0.0,
+        "stock_moyen": float(ie.avg_inventory or 0) if ie else 0.0,
+        "resultat_net": float(ie.net_income or 0) if ie else 0.0,
+        "preuve_revenu": (ie.income_proof_level if ie else None) or "N1",
+        "preuve_charge": (ie.expense_proof_level if ie else None) or "N1",
+        "saisonnier": bool(act.is_seasonal) if act else False,
+        "type_activite": (act.activity_type if act else None) or "commerce",
+        "valeur_garanties": float(saisie.value_amount or 0) if saisie else 0.0,
+    }
+    return {
+        "collecte": body.get("collecte"),
+        "complete": complete,
+        "tresorerie": body.get("tresorerie"),
+        "patrimoine": body.get("patrimoine"),
+    }
+
+
+# Statuts ou le dossier est encore entre les mains de l'agent. Au-dela, il est
+# engage dans le circuit de decision : on ne reecrit pas un dossier deja signe.
+STATUTS_MODIFIABLES = frozenset({"brouillon", "analyse", "renvoye"})
+
+
+@router.patch("/demandes/{demande_id}", tags=["demandes"], response_model=DemandeCreateOut)
+def modifier_demande(
+    demande_id: int, body: DemandeUpdate, user: AgentUser, db: Session = Depends(get_db)
+):
+    """Corrige les termes d'une demande encore ouverte.
+
+    Il n'existait aucune ecriture sur la demande apres sa creation : un dossier
+    renvoye par le chef pour « montant a revoir » ne pouvait pas etre revu.
+    """
+    app = db.get(CreditApplication, demande_id)
+    if not app:
+        raise HTTPException(404, "Demande introuvable")
+    if app.status not in STATUTS_MODIFIABLES:
+        raise HTTPException(
+            409,
+            f"Dossier au statut '{app.status}' : il n'est plus modifiable "
+            f"(statuts modifiables : {', '.join(sorted(STATUTS_MODIFIABLES))}).",
+        )
+    champs = body.model_dump(exclude_unset=True)
+    if body.produit_id is not None and not db.get(CreditProduct, body.produit_id):
+        raise HTTPException(422, "Produit inconnu")
+    correspondance = {
+        "objet": "purpose",
+        "montant_demande": "requested_amount",
+        "duree_mois": "term_months",
+        "produit_id": "product_id",
+        "situation_fiscale": "tax_status",
+        "credits_ailleurs": "has_external_credits",
+        "preuves_externes_ok": "external_proofs_ok",
+    }
+    for cle, valeur in champs.items():
+        colonne = correspondance.get(cle)
+        if colonne:
+            setattr(app, colonne, valeur)
+    if body.collecte:
+        _persist_collecte(db, demande_id, body.collecte)
+    db.add(
+        AuditLog(
+            application_id=demande_id,
+            user_id=user.id,
+            action="modifier",
+            detail=", ".join(sorted(k for k in champs if k != "collecte")) or "collecte",
+        )
+    )
+    db.commit()
+    return {"id": app.id, "statut": app.status}
 
 
 @router.get("/demandes/{demande_id}/tresorerie", tags=["demandes"])
@@ -1100,20 +1221,59 @@ def get_pieces(demande_id: int, _user: StaffUser, db: Session = Depends(get_db))
     return [{"type_piece": p.document_type, "qualite_ocr": p.ocr_quality, "fichier": p.file_path} for p in pieces]
 
 
+def _noms_utilisateurs(db: Session, user_ids: list[int]) -> dict[int, str]:
+    """Resout les auteurs en une requete : une piste d'audit qui n'affiche
+    qu'un `user_id` n'est pas exploitable lors d'un controle."""
+    ids = {i for i in user_ids if i}
+    if not ids:
+        return {}
+    rows = db.scalars(select(AppUser).where(AppUser.id.in_(ids))).all()
+    return {u.id: u.full_name for u in rows}
+
+
 @router.get("/demandes/{demande_id}/decisions", tags=["workflow"])
 def get_decisions(demande_id: int, _user: StaffUser, db: Session = Depends(get_db)):
     if not db.get(CreditApplication, demande_id):
         raise HTTPException(404, "Demande introuvable")
-    decs = db.scalars(select(Decision).where(Decision.application_id == demande_id)).all()
-    return [{"niveau": x.level, "avis": x.opinion, "motif": x.reason, "override": x.is_override} for x in decs]
+    decs = db.scalars(
+        select(Decision)
+        .where(Decision.application_id == demande_id)
+        .order_by(Decision.decided_at)
+    ).all()
+    noms = _noms_utilisateurs(db, [x.user_id for x in decs])
+    return [
+        {
+            "niveau": x.level,
+            "avis": x.opinion,
+            "motif": x.reason,
+            "override": x.is_override,
+            "auteur": noms.get(x.user_id),
+            "date": x.decided_at.isoformat() if x.decided_at else None,
+        }
+        for x in decs
+    ]
 
 
 @router.get("/demandes/{demande_id}/audit", tags=["workflow"])
 def get_audit(demande_id: int, _user: StaffUser, db: Session = Depends(get_db)):
+    """Piste d'audit : qui, quoi, quand, motif — exigence de tracabilite BCEAO."""
     if not db.get(CreditApplication, demande_id):
         raise HTTPException(404, "Demande introuvable")
-    rows = db.scalars(select(AuditLog).where(AuditLog.application_id == demande_id)).all()
-    return [{"action": r.action, "detail": r.detail} for r in rows]
+    rows = db.scalars(
+        select(AuditLog)
+        .where(AuditLog.application_id == demande_id)
+        .order_by(AuditLog.logged_at)
+    ).all()
+    noms = _noms_utilisateurs(db, [r.user_id for r in rows])
+    return [
+        {
+            "action": r.action,
+            "detail": r.detail,
+            "auteur": noms.get(r.user_id),
+            "date": r.logged_at.isoformat() if r.logged_at else None,
+        }
+        for r in rows
+    ]
 
 
 @router.get("/demandes/{demande_id}/cautions", tags=["demandes"])
@@ -1370,12 +1530,18 @@ def amortissement(
         duree_mois = app.term_months
     tableau = generer(montant, duree_mois, taux_nominal, taux_assurance)
     rows = tableau["lignes"]
+    # Date d'echeance de chaque ligne : elle etait calculee pour la persistance
+    # mais jamais renvoyee, alors qu'un echeancier sans dates n'aide personne
+    # sur le terrain. Meme regle en simulation, pour que les deux coincident.
+    today = date.today()
+    for r in rows:
+        month = today.month + r["numero"]
+        r["due_on"] = date(
+            today.year + (month - 1) // 12, (month - 1) % 12 + 1, min(today.day, 28)
+        ).isoformat()
     if not simulation:
         db.execute(delete(AmortizationLine).where(AmortizationLine.application_id == demande_id))
-        today = date.today()
         for r in rows:
-            month = today.month + r["numero"]
-            due = date(today.year + (month - 1) // 12, (month - 1) % 12 + 1, min(today.day, 28))
             db.add(
                 AmortizationLine(
                     application_id=demande_id,
@@ -1385,7 +1551,7 @@ def amortissement(
                     interest_amount=r["interet"],
                     insurance_amount=r["assurance"],
                     remaining_principal=r["restant"],
-                    due_on=due,
+                    due_on=r["due_on"],
                 )
             )
         db.commit()
@@ -1398,6 +1564,7 @@ def amortissement(
         "assurance_mensuelle": tableau["assurance_mensuelle"],
         "mensualite_totale": tableau["mensualite_totale"],
         "cout_total": tableau["cout_total"],
+        "total_a_rembourser": montant + tableau["cout_total"],
         "lignes": rows,
     }
 

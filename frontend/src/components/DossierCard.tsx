@@ -4,7 +4,7 @@ import { zoneClass, type DemandeResume } from "../api/client";
 export const STATUS_LABEL: Record<string, string> = {
   brouillon: "Brouillon",
   analyse: "Analysé",
-  soumis_chef: "Chez le Chef",
+  soumis_chef: "Chez le Directeur",
   renvoye: "Renvoyé à l’agent",
   soumis_cic: "Au CIC",
   accorde: "Accordé",

@@ -50,7 +50,7 @@ Compose charge aussi le volume CSV (`db-seed`). Laptop lent : `LOAD_VOLUME=0 doc
 
 ## Rôles démo
 
-`agent` · `chef` · `cic` — mot de passe `demo`. JWT Bearer. Spec greffe SI : [SECURITE_ECHANGES_PILOTE.md](SECURITE_ECHANGES_PILOTE.md).
+`agent` · `direct` · `cic` — mots de passe `agent`, `direct`, `cic`. JWT Bearer. Spec greffe SI : [SECURITE_ECHANGES_PILOTE.md](SECURITE_ECHANGES_PILOTE.md).
 
 ## Sync
 

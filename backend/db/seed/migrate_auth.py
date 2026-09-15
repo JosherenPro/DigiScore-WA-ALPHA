@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ALTER idempotent + mot de passe demo pour un volume Postgres deja cree."""
+"""ALTER idempotent + mots de passe demo pour un volume Postgres deja cree."""
 
 from __future__ import annotations
 
@@ -9,7 +9,11 @@ import bcrypt
 import psycopg
 
 DSN = os.getenv("DATABASE_URL", "postgresql://digiscore:digiscore@localhost:5432/digiscore")
-DEMO = os.getenv("DEMO_PASSWORD", "demo")
+DEMO_PASSWORDS = {
+    "agent": os.getenv("AGENT_PASSWORD", "agent"),
+    "direct": os.getenv("DIRECT_PASSWORD", "direct"),
+    "cic": os.getenv("CIC_PASSWORD", "cic"),
+}
 
 STMTS = [
     "ALTER TABLE app_user ADD COLUMN IF NOT EXISTS password_hash VARCHAR(128)",
@@ -65,16 +69,16 @@ STMTS = [
 
 def main() -> None:
     dsn = DSN.replace("postgresql+psycopg://", "postgresql://")
-    hashed = bcrypt.hashpw(DEMO.encode(), bcrypt.gensalt()).decode()
     with psycopg.connect(dsn) as conn:
         with conn.cursor() as cur:
             for stmt in STMTS:
                 cur.execute(stmt)
-            cur.execute(
-                "UPDATE app_user SET password_hash = %s WHERE login IN ('agent', 'chef', 'cic')",
-                (hashed,),
-            )
-            print("auth migrate OK, password_hash mis a jour pour", cur.rowcount, "users")
+            changed = 0
+            for login, pwd in DEMO_PASSWORDS.items():
+                hashed = bcrypt.hashpw(pwd.encode(), bcrypt.gensalt()).decode()
+                cur.execute("UPDATE app_user SET password_hash = %s WHERE login = %s", (hashed, login))
+                changed += cur.rowcount
+            print("auth migrate OK, password_hash mis a jour pour", changed, "users")
         conn.commit()
 
 

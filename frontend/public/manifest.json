@@ -3,8 +3,16 @@
   "short_name": "DigiScore",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0B3D5C",
-  "theme_color": "#0B3D5C",
+  "background_color": "#f7f6f1",
+  "theme_color": "#0b6e3d",
   "lang": "fr",
-  "icons": [{ "src": "/logo-alpha.svg", "sizes": "any", "type": "image/svg+xml" }]
+  "icons": [
+    {
+      "src": "/logo-alpha.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "description": "Copilote d'eligibilite au credit pour les COOPEC et IMF de l'UMOA.",
+  "scope": "/"
 }

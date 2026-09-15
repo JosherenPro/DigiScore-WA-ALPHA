@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, asList, money, zoneClass, type DemandeDetail, type Knockout, type Critere } from "../api/client";
+import { api, asList, money, zoneClass, type AuditEntry, type DemandeDetail, type Knockout, type Critere } from "../api/client";
 import { getUser } from "../auth";
 import Spinner from "../components/Spinner";
 import Alert from "../components/Alert";
 import MlPanel from "../components/MlPanel";
+import Section from "../components/Section";
 import AuthImage from "../components/AuthImage";
-import { CompareBar, CRITERE_LABELS, CriteriaBars, ScoreGauge } from "../components/charts";
+import { CompareBar, CRITERE_LABELS, CriteriaBars, ScoreGauge, ZONE_SCORE_LABEL } from "../components/charts";
 import { useApi } from "../hooks/useApi";
 
 function msgClass(code?: string) {
@@ -14,6 +15,66 @@ function msgClass(code?: string) {
   if (["MONTANT_OK", "UPSELL_POSSIBLE"].includes(code)) return "msg ok";
   if (["MONTANT_PLAFONNE", "VOIE_EXCEPTIONNELLE", "HISTORIQUE_INSUFFISANT"].includes(code)) return "msg plafonne";
   return "msg ko";
+}
+
+/** Horodatage court, lisible par un contrôleur : date + heure locale. */
+function quand(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
+}
+
+const STATUT_CLOS: Record<string, string> = {
+  accorde: "accordé",
+  conditionne: "accordé sous conditions",
+  refuse: "refusé",
+  clos: "clos",
+};
+
+const AUDIT_LABEL: Record<string, string> = {
+  create: "Dossier créé",
+  collecte: "Collecte économique saisie",
+  piece: "Pièce justificative jointe",
+  analyser: "Analyse lancée",
+  soumettre: "Soumis pour décision",
+  valider: "Validé par le Directeur (Chef d’Agence)",
+  renvoyer: "Renvoyé à l’agent",
+  escalader: "Escaladé au CIC",
+  accorder: "Accordé",
+  conditionner: "Accordé sous conditions",
+  refuser: "Refusé",
+};
+
+/** Piste d'audit (GET /demandes/:id/audit). Le backend journalise chaque etape
+ * du dossier ; sans cette section, l'ecran ne montrait que la derniere decision
+ * — or c'est justement la tracabilite qui rend la decision defendable. */
+function AuditTrail({ demandeId }: { demandeId: number }) {
+  const [rows, setRows] = useState<AuditEntry[] | null>(null);
+
+  useEffect(() => {
+    api.audit(demandeId).then(setRows).catch(() => setRows([]));
+  }, [demandeId]);
+
+  if (!rows || rows.length === 0) return null;
+
+  return (
+    <Section titre="Piste d’audit" compteur={rows.length} resume="Qui, quoi, quand">
+      <ol className="top-list">
+        {rows.map((r, i) => (
+          <li key={i}>
+            <span className="num">{i + 1}</span>
+            <span>
+              <strong>{AUDIT_LABEL[r.action] || r.action}</strong>
+              <div className="muted">
+                {[r.auteur, quand(r.date)].filter(Boolean).join(" · ") || "auteur inconnu"}
+              </div>
+              {r.detail && <div className="muted">{r.detail}</div>}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </Section>
+  );
 }
 
 export default function Resultat() {
@@ -81,28 +142,81 @@ export default function Resultat() {
   const knockouts = asList<Knockout>(s?.knockouts as Knockout[] | Record<string, unknown> | null);
   const chef = user?.role === "chef_agence" && d.statut === "soumis_chef";
   const cic = user?.role === "cic" && d.statut === "soumis_cic";
+  // Un dossier tranche n'attend plus rien : la suite naturelle est un nouveau
+  // credit pour ce membre, pas de rester sur un ecran en lecture seule.
+  const dossierClos = ["accorde", "conditionne", "refuse", "clos"].includes(d.statut);
+  const renvoye = d.statut === "renvoye";
+  // Le backend ne verrouille ni l'analyse (elle archive le score precedent) ni
+  // la soumission (elle exige seulement un score) : un dossier renvoye peut
+  // repartir. Seul l'ecran l'interdisait, ce qui en faisait une impasse.
+  const peutReanalyser = user?.role === "agent" && !dossierClos;
+  // Miroir de STATUTS_MODIFIABLES cote API : au-dela, le dossier est engage
+  // dans le circuit de decision et l'ecriture est refusee (409).
+  const peutCorriger =
+    user?.role === "agent" && ["brouillon", "analyse", "renvoye"].includes(d.statut);
+  const peutSoumettre =
+    user?.role === "agent" && !!s && ["analyse", "brouillon", "renvoye"].includes(d.statut);
+  // Motif du renvoi : sans lui, l'agent ne sait pas ce qu'on lui demande de corriger.
+  const motifRenvoi = [...(d.decisions || [])].reverse().find((x) => x.avis === "renvoyer");
+  const membreBloque = !!d.membre?.statut && d.membre.statut !== "actif";
+  const peutSouscrire = user?.role === "agent" && !membreBloque;
 
   return (
     <div className="page">
       <h1>Résultat — dossier #{d.id}</h1>
       <p className="lede">
-        {d.membre ? `${d.membre.prenom} ${d.membre.nom} · ${d.membre.code_externe}` : `Membre #${d.membre_id}`} · {d.objet} ·{" "}
-        <span className="badge">{d.statut}</span>
+        {d.membre ? (
+          <>
+            <Link to={`/membres/${d.membre.id}`}>
+              {d.membre.prenom} {d.membre.nom}
+            </Link>{" "}
+            · {d.membre.code_externe}
+          </>
+        ) : (
+          <Link to={`/membres/${d.membre_id}`}>Membre #{d.membre_id}</Link>
+        )}{" "}
+        · {d.objet} · <span className="badge">{d.statut}</span>
+        {membreBloque && <span className="badge bad">compte {d.membre?.statut}</span>}
       </p>
       {fileHint && <Alert kind="success">{fileHint}</Alert>}
-      {!s && (
+
+      {renvoye && (
+        <div className="msg plafonne">
+          <strong>Dossier renvoyé pour correction</strong>
+          <div>
+            {motifRenvoi?.motif
+              ? `Motif : ${motifRenvoi.motif}`
+              : "Aucun motif n’a été consigné lors du renvoi."}
+            {motifRenvoi?.auteur ? ` — ${motifRenvoi.auteur}` : ""}
+          </div>
+          <div className="muted mt-sm">
+            Corrige ce qui est demandé, relance l’analyse, puis soumets à nouveau.
+          </div>
+          {peutCorriger && (
+            <div className="actions">
+              <Link className="btn primary" to={`/demandes/${d.id}/modifier`}>
+                Corriger le dossier
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
+      {!s && peutReanalyser && (
         <div className="actions">
           <button className="btn" disabled={busy} onClick={analyser}>
             Lancer l’analyse
           </button>
         </div>
       )}
+      {!s && !peutReanalyser && (
+        <p className="muted">Dossier non analysé.</p>
+      )}
       {s && (
         <>
           <div className={msgClass(s.message_code)}>
             <strong>{s.message_code}</strong>
             <div>{s.message_humain}</div>
-            {s.zone && <div className={`badge ${zoneClass(s.zone)} mt-sm`}>{s.zone}</div>}
+            {s.zone && <div className={`badge ${zoneClass(s.zone)} mt-sm`}>{ZONE_SCORE_LABEL[s.zone] || s.zone}</div>}
           </div>
           <section className="block dashboard-head">
             <div className="gauge-card">
@@ -201,8 +315,7 @@ export default function Resultat() {
             </section>
           )}
           {d.cautions.length > 0 && (
-            <section className="block mt-md">
-              <h2>Cautionnaires</h2>
+            <Section titre="Cautionnaires" compteur={d.cautions.length}>
               <div className="list">
                 {d.cautions.map((c, i) => (
                   <div className="row" key={i}>
@@ -228,11 +341,10 @@ export default function Resultat() {
                   </div>
                 ))}
               </div>
-            </section>
+            </Section>
           )}
           {d.pieces.length > 0 && (
-            <section className="block mt-md">
-              <h2>Pièces justificatives</h2>
+            <Section titre="Pièces justificatives" compteur={d.pieces.length}>
               <div className="list">
                 {d.pieces.map((p, i) => (
                   <div className="row" key={i}>
@@ -248,7 +360,7 @@ export default function Resultat() {
                   </div>
                 ))}
               </div>
-            </section>
+            </Section>
           )}
         </>
       )}
@@ -292,20 +404,91 @@ export default function Resultat() {
         </section>
       )}
       {d.decisions?.length > 0 && (
-        <p className="muted mt-lg">
-          Décisions : {d.decisions.map((x) => `${x.niveau} ${x.avis}`).join(" · ")}
-        </p>
+        <section className="block mt-md">
+          <h2>Décisions</h2>
+          <div className="list">
+            {d.decisions.map((x, i) => (
+              <div className="row" key={i}>
+                <div>
+                  <strong>{x.niveau.replace("_", " ")} — {x.avis}</strong>
+                  <div className="muted">{[x.auteur, quand(x.date)].filter(Boolean).join(" · ")}</div>
+                  {x.motif && <div className="muted">{x.motif}</div>}
+                </div>
+                {x.override && <span className="badge rect warn">Écart motivé</span>}
+              </div>
+            ))}
+          </div>
+        </section>
       )}
+
+      <AuditTrail demandeId={d.id} />
       {error && <Alert kind="error">{error}</Alert>}
-      <div className="actions">
-        {s && user?.role === "agent" && (d.statut === "analyse" || d.statut === "brouillon") && (
+
+      {/* Suite du parcours. Un dossier clos renvoyait l'agent dans le vide :
+          il devait repasser par la recherche membre pour ouvrir le credit
+          suivant. La prochaine action est proposee ici, en clair. */}
+      {dossierClos && (
+        <section className="block suite mt-md">
+          <h2>Et maintenant ?</h2>
+          <p className="muted">
+            Ce dossier est {STATUT_CLOS[d.statut] || d.statut}. Il n’attend plus d’action.
+          </p>
+          <div className="actions">
+            {peutSouscrire && (
+              <Link className="btn primary" to={`/membres/${d.membre_id}/demande`}>
+                Souscrire un nouveau crédit pour ce membre
+              </Link>
+            )}
+            {membreBloque && (
+              <p className="error">
+                Compte {d.membre?.statut} — aucun nouveau crédit possible pour ce membre.
+              </p>
+            )}
+            <Link className="btn ghost" to={`/membres/${d.membre_id}`}>
+              Fiche du membre
+            </Link>
+            {user?.role === "agent" ? (
+              <Link className="btn ghost" to="/demandes">
+                Retour aux dossiers
+              </Link>
+            ) : (
+              <Link className="btn ghost" to={user?.role === "cic" ? "/cic" : "/chef"}>
+                Retour à la file
+              </Link>
+            )}
+          </div>
+        </section>
+      )}
+
+      <div className="actions mt-md">
+        {peutSoumettre && (
           <button className="btn primary" disabled={busy} onClick={soumettre}>
-            Soumettre au chef d’agence
+            {renvoye ? "Soumettre à nouveau" : "Soumettre au Directeur (Chef d’Agence)"}
+          </button>
+        )}
+        {peutCorriger && !renvoye && (
+          <Link className="btn ghost" to={`/demandes/${d.id}/modifier`}>
+            Corriger le dossier
+          </Link>
+        )}
+        {s && peutReanalyser && (
+          <button className="btn ghost" disabled={busy} onClick={analyser}>
+            Relancer l’analyse
           </button>
         )}
         <Link className="btn ghost" to={`/demandes/${d.id}/memo`}>
           Mémo + échéancier
         </Link>
+        <Link className="btn ghost" to={`/membres/${d.membre_id}`}>
+          Fiche du membre
+        </Link>
+        {/* Sur un dossier encore vivant, ouvrir un credit reste possible mais
+            discret : ce n'est pas l'action attendue a cet instant. */}
+        {!dossierClos && peutSouscrire && (
+          <Link className="btn ghost" to={`/membres/${d.membre_id}/demande`}>
+            Nouveau crédit pour ce membre
+          </Link>
+        )}
       </div>
     </div>
   );

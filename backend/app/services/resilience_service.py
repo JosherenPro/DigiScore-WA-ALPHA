@@ -85,6 +85,10 @@ LIBELLES_DEFAUT: dict[str, str] = {
     "optimiste": "Trajectoire optimiste",
 }
 LIBELLES_CHOC_PAR_ACTIVITE: dict[str, str] = {
+    "primaire": "Mauvaise récolte",
+    "secondaire": "Baisse de la demande",
+    "tertiaire": "Mévente prolongée",
+    # anciennes valeurs du seed v1 (rétro-compatibilité)
     "agriculture": "Mauvaise récolte",
     "commerce": "Mévente prolongée",
     "services": "Creux d'activité",

@@ -6,11 +6,13 @@ import Alert from "../components/Alert";
 import Spinner from "../components/Spinner";
 import { STATUS_LABEL } from "../components/DossierCard";
 import { TrendChart } from "../components/charts";
+import MlSection from "../components/MlSection";
+import EarlyWarning from "../components/EarlyWarning";
 
 const ZONE_LABEL: Record<string, string> = {
-  approbation: "Approbation",
-  analyse: "Analyse",
-  rejet: "Rejet",
+  approbation: "Approbation suggérée",
+  analyse: "Autorisation hiérarchique",
+  rejet: "Dossier à régulariser",
   non_analyse: "Non analysé",
 };
 
@@ -57,44 +59,23 @@ export default function Dashboard() {
       <p className="lede">Vue d’ensemble de tes dossiers — agrégats calculés en temps réel.</p>
 
       {caps?.early_warning && (
-        <section className="block ml">
-          <div className="ml-h2-row">
-            <span className="ml-tag">Éclairage ML — consultatif, jamais décisionnel</span>
-            {ewModel && <span className="badge">modèle {ewModel}</span>}
-          </div>
-          <h2>Early warning — risque de retard à 30–90 jours sur ton portefeuille</h2>
-          {ewAlertes === null && <Spinner />}
-          {ewAlertes?.length === 0 && <p className="muted">Rien à signaler sur ton portefeuille pour l’instant.</p>}
-          {ewAlertes && ewAlertes.length > 0 && (
-            <>
-              <div className="stat-row">
-                <div className="stat-tile">
-                  <span className="muted">Membres à surveiller</span>
-                  <strong>{ewAlertes.length}</strong>
-                </div>
-                <div className="stat-tile">
-                  <span className="muted">Exposition concernée</span>
-                  <strong>{money(totalExposure)}</strong>
-                </div>
-                <div className="stat-tile">
-                  <span className="muted">Risque le plus élevé</span>
-                  <strong>{Math.round(Math.max(...ewAlertes.map((a) => a.p_par30_90j)) * 100)} %</strong>
-                </div>
-              </div>
-              <ul className="ml-factors mt-sm">
-                {ewAlertes.slice(0, 3).map((a) => (
-                  <li key={a.member_code}>
-                    <strong>{a.member_code}</strong> — {Math.round(a.p_par30_90j * 100)} % de risque · {money(a.exposure)}
-                    {a.signals.length > 0 ? ` · ${a.signals.join(", ")}` : ""}
-                  </li>
-                ))}
-              </ul>
-              <Link className="btn ghost sm mt-sm" to="/m6">
-                Voir tout le portefeuille →
-              </Link>
-            </>
+        <MlSection
+          titre="Early warning — risque de retard à 30–90 jours sur ton portefeuille"
+          resume={
+            ewAlertes
+              ? `${ewAlertes.length} membre${ewAlertes.length > 1 ? "s" : ""} à surveiller · ${money(totalExposure)} exposés`
+              : "chargement…"
+          }
+          badge={ewModel ? <span className="badge">modèle {ewModel}</span> : undefined}
+        >
+          {ewAlertes?.length === 0 && (
+            <p className="muted">Rien à signaler sur ton portefeuille pour l’instant.</p>
           )}
-        </section>
+          <EarlyWarning alertes={ewAlertes} limite={5} />
+          <Link className="btn ghost sm mt-sm" to="/m6">
+            Voir tout le portefeuille →
+          </Link>
+        </MlSection>
       )}
 
       <section className="block dashboard-head mt-md">

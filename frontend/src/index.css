@@ -40,7 +40,7 @@ body,
 
 body {
   margin: 0;
-  font-family: "DM Sans", "Source Sans 3", sans-serif;
+  font-family: "DM Sans", "Source Sans 3", Roboto, "Segoe UI", system-ui, -apple-system, sans-serif;
   color: var(--text);
   background:
     radial-gradient(900px 420px at 100% -10%, rgba(11, 110, 61, 0.08), transparent 50%),
@@ -1451,6 +1451,54 @@ td {
   letter-spacing: 0.04em;
 }
 
+.gauge-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: none;
+}
+
+.gauge-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-top: 0.3rem;
+  max-width: 300px;
+}
+
+.gauge-legend-item {
+  font-size: 0.72rem;
+  line-height: 1.2;
+  padding: 0.22rem 0.5rem;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.gauge-legend-item strong {
+  font-weight: 700;
+}
+
+.gauge-legend-item.low.active {
+  border-color: var(--zone-low);
+  background: var(--red-soft);
+  color: var(--zone-low);
+}
+
+.gauge-legend-item.mid.active {
+  border-color: var(--zone-mid);
+  background: #fdf3e0;
+  color: var(--zone-mid);
+}
+
+.gauge-legend-item.high.active {
+  border-color: var(--zone-high);
+  background: #e8f6ee;
+  color: var(--zone-high);
+}
+
 .dashboard-head {
   background: linear-gradient(180deg, var(--paper), var(--surface));
 }
@@ -1885,4 +1933,801 @@ td {
   h1 {
     font-size: 1.4rem;
   }
+}
+
+/* ---- File chef d'agence / CIC ------------------------------------------- */
+/* Une carte par dossier, avec sa propre décision. Reprend la grammaire de
+   .dcard (avatar, score, badges rectangulaires) pour que l'écran de revue et
+   l'écran agent se lisent de la même façon, mais en pleine largeur : ici on
+   ne survole pas une liste, on signe un dossier à la fois. */
+.qlist {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.qcard {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+  box-shadow: 0 1px 0 rgba(9, 60, 36, 0.03);
+}
+
+.qcard-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+
+.qcard-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+}
+
+.qcard-reco {
+  margin: 0.7rem 0 0;
+  padding: 0.5rem 0.7rem;
+  border-left: 3px solid var(--green);
+  background: var(--green-soft);
+  border-radius: 0 8px 8px 0;
+  font-size: 0.9rem;
+}
+
+.qcard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--line);
+}
+
+/* L'avis choisi reste visible pendant qu'on rédige le motif : sans cet état,
+   on ne sait plus ce qu'on est en train de confirmer. */
+.qcard-actions .btn.active {
+  outline: 2px solid var(--green-deep);
+  outline-offset: 1px;
+}
+
+.qcard-confirm {
+  margin-top: 0.85rem;
+  padding: 0.85rem;
+  background: var(--surface);
+  border-radius: 10px;
+}
+
+.qcard-confirm .req {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .qcard-actions .btn {
+    flex: 1 1 auto;
+  }
+}
+
+/* ---- Espace chef d'agence / CIC ----------------------------------------- */
+/* Les cartes d'appel a l'action portent le chiffre en grand : la question a
+   laquelle cet ecran repond en premier est « combien de dossiers m'attendent ». */
+.revue-cta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.revue-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  text-decoration: none;
+  color: var(--text);
+}
+
+.revue-card:hover {
+  border-color: #a9c2ae;
+}
+
+.revue-card.urgent {
+  border-color: var(--green);
+  background: var(--green-soft);
+}
+
+.revue-num {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--green-deep);
+}
+
+.revue-label {
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+/* Aging en barres horizontales : la part de chaque tranche de retard se lit
+   plus vite qu'une colonne de pourcentages. */
+.revue-aging {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.revue-aging-row {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+}
+
+.revue-aging-label {
+  color: var(--muted);
+}
+
+.revue-aging-track {
+  height: 10px;
+  background: var(--surface);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.revue-aging-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--muted);
+}
+
+.revue-aging-fill.ok {
+  background: var(--ok);
+}
+
+.revue-aging-fill.warn {
+  background: var(--warning);
+}
+
+.revue-aging-fill.bad {
+  background: var(--danger);
+}
+
+.revue-aging-value {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  .revue-aging-row {
+    grid-template-columns: 5rem 1fr auto;
+  }
+}
+
+/* ---- Infobulle (barème des critères) ------------------------------------ */
+.infotip {
+  position: relative;
+  display: inline-flex;
+  margin-left: 0.3rem;
+  vertical-align: middle;
+}
+
+.infotip-btn {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.infotip-btn:hover,
+.infotip-btn:focus-visible {
+  border-color: var(--green);
+  color: var(--green-deep);
+  background: var(--green-soft);
+}
+
+.infotip-bubble {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 2rem));
+  padding: 0.7rem 0.8rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  font-size: 0.8rem;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--text);
+  text-align: left;
+  white-space: normal;
+  /* Masquée sans être retirée de l'arbre : aria-describedby doit continuer de
+     pointer vers un contenu lisible par les lecteurs d'écran. */
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.infotip:hover .infotip-bubble,
+.infotip:focus-within .infotip-bubble,
+.infotip.open .infotip-bubble {
+  visibility: visible;
+  opacity: 1;
+}
+
+.infotip-titre {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: var(--green-deep);
+}
+
+.infotip-mesure {
+  display: block;
+  color: var(--muted);
+}
+
+.infotip-bubble ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.infotip-bubble li {
+  margin: 0.12rem 0;
+}
+
+.infotip-note {
+  display: block;
+  margin-top: 0.4rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* La ligne de critère doit laisser respirer le libellé + son point d'aide. */
+.crit-label {
+  display: inline-flex;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  /* Sur mobile la bulle se cale sur la largeur de page plutôt que sur le
+     bouton, sinon elle déborde hors de l'écran. */
+  .infotip-bubble {
+    left: auto;
+    right: 0;
+    transform: none;
+  }
+}
+
+/* ---- Section ML dépliable ----------------------------------------------- */
+/* Repliée par défaut : l'éclairage ML est consultatif, il ne doit pas pousser
+   le contenu métier (score règles, décision) sous la ligne de flottaison. */
+.ml-collapsible {
+  padding: 0;
+  overflow: hidden;
+}
+
+.ml-toggle {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.9rem 1.1rem;
+  background: none;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.ml-toggle:hover .ml-toggle-titre {
+  text-decoration: underline;
+}
+
+.ml-toggle-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  min-width: 0;
+}
+
+.ml-toggle-titre {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.ml-toggle-resume {
+  font-size: 0.85rem;
+}
+
+.ml-toggle-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+}
+
+.ml-chevron {
+  display: flex;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.ml-collapsible.open .ml-chevron {
+  transform: rotate(180deg);
+}
+
+.ml-collapsible-body {
+  padding: 0 1.1rem 1.1rem;
+}
+
+/* Le titre du premier bloc interne ferait doublon avec le titre du toggle. */
+.ml-collapsible-body > .ml-block:first-child > .ml-h2-row {
+  margin-top: 0;
+}
+
+/* CTA principale de la fiche membre : souscrire un crédit est l'action pour
+   laquelle on ouvre cet écran, elle reste au-dessus de la ligne de flottaison. */
+.membre-cta {
+  margin: 0.9rem 0 0.2rem;
+}
+
+/* ---- Recouvrement : relance, progrès, journal ---------------------------- */
+.visite-card.en-retard {
+  border-left: 3px solid var(--danger);
+}
+
+/* --- Lots de dossiers (regroupement par client) --- */
+/* Onglet "Dossiers" du Recouvrement + liste "Dossiers" de l'agent :
+ * un membre qui cumule les prêts en retard ne doit pas inonder l'écran. */
+.lots {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.lot {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.1rem 1rem 0.6rem;
+}
+
+.lot.en-retard {
+  border-left: 3px solid var(--danger);
+}
+
+.lot-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.lot-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: 0;
+  padding: 0.85rem 0;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+  font: inherit;
+}
+
+.lot-chevron {
+  flex: none;
+  color: var(--green-deep);
+  transition: transform 0.18s ease;
+  display: flex;
+}
+
+.lot-chevron.open {
+  transform: rotate(180deg);
+}
+
+.lot-id {
+  min-width: 0;
+}
+
+.lot-id strong {
+  display: block;
+  font-size: 1rem;
+}
+
+.lot-id .muted {
+  font-size: 0.82rem;
+}
+
+.lot-actions {
+  display: flex;
+  gap: 0.45rem;
+  flex: none;
+}
+
+.lot-cards {
+  padding-top: 0.35rem;
+}
+
+.lot-cards .visite-card {
+  margin-bottom: 0.6rem;
+}
+
+.rec-relance {
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
+}
+
+.rec-relance.bad {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.rec-relance.warn {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.rec-progres {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+  font-size: 0.82rem;
+}
+
+.rec-progres-track {
+  flex: 1;
+  height: 8px;
+  background: var(--surface);
+  border-radius: 999px;
+  overflow: hidden;
+  max-width: 220px;
+}
+
+.rec-progres-fill {
+  display: block;
+  height: 100%;
+  background: var(--ok);
+  border-radius: 999px;
+}
+
+.rec-journal {
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 0.7rem 0.85rem;
+}
+
+.rec-journal-list {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.rec-journal-list li {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  align-items: start;
+}
+
+.rec-journal-date {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.rec-journal-list .badge {
+  margin-left: 0.4rem;
+}
+
+/* ---- Early warning ------------------------------------------------------ */
+.ew-list {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.ew-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.7rem 0.85rem;
+  background: var(--paper);
+}
+
+.ew-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.ew-id {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.ew-id .muted {
+  font-size: 0.82rem;
+}
+
+.ew-expo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-variant-numeric: tabular-nums;
+}
+
+.ew-expo .muted {
+  font-size: 0.75rem;
+}
+
+.ew-signaux {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.83rem;
+  color: var(--text);
+}
+
+/* ---- Échéancier d'amortissement ----------------------------------------- */
+.amort-resume {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.amort-principal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.85rem 1rem;
+  background: var(--green-soft);
+  border-radius: 10px;
+}
+
+.amort-principal strong {
+  font-size: 1.7rem;
+  line-height: 1.15;
+  color: var(--green-deep);
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.amort-table {
+  min-width: 620px;
+}
+
+/* Impression du mémo comité : la navigation n'a rien à faire sur le papier. */
+@media print {
+  .sidebar,
+  .bottom-nav,
+  .mobile-topbar,
+  .copilote,
+  .no-print,
+  .actions .btn {
+    display: none !important;
+  }
+
+  .page-body,
+  .main {
+    margin: 0;
+    padding: 0;
+  }
+
+  .block {
+    break-inside: avoid;
+    box-shadow: none;
+  }
+}
+
+/* Visite déjà consignée : on la garde visible (preuve que l'enregistrement a
+   eu lieu) mais en retrait, pour que l'œil aille aux visites restantes. */
+.visite-card.fait {
+  opacity: 0.62;
+  border-color: var(--green);
+}
+
+/* Identité membre : nom en avant, code de gestion dessous. */
+.membre-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.membre-label-code {
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Section repliable générique ---------------------------------------- */
+.sec {
+  padding: 0;
+  overflow: hidden;
+}
+
+.sec + .sec {
+  margin-top: 0.6rem;
+}
+
+.sec-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.85rem 1.1rem;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sec-head:disabled {
+  cursor: default;
+}
+
+.sec-titre {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 600;
+  font-size: 1rem;
+  flex: none;
+}
+
+/* Le compteur dit qu'il y a matière à ouvrir, sans avoir à déplier. */
+.sec-compteur {
+  min-width: 1.35rem;
+  padding: 0 0.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  background: var(--green-soft);
+  color: var(--green-deep);
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sec.vide .sec-compteur {
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.sec-resume {
+  font-size: 0.83rem;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sec-chevron {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.sec.open .sec-chevron {
+  transform: rotate(180deg);
+}
+
+.sec-vide-label {
+  font-size: 0.78rem;
+}
+
+.sec-head:not(:disabled):hover .sec-titre {
+  color: var(--green-deep);
+}
+
+.sec-body {
+  padding: 0 1.1rem 1.1rem;
+}
+
+.sec-body > table:first-child,
+.sec-body > .list:first-child {
+  margin-top: 0;
+}
+
+/* ---- Rythme et matière ---------------------------------------------------
+   Les écrans empilent beaucoup de cartes. Une ombre portée large sur chacune
+   (var(--shadow) : 30px de flou) les faisait toutes flotter et brouillait la
+   lecture d'une pile. On garde l'ombre pour ce qui se superpose vraiment
+   (sidebar, infobulle) et on tient les cartes par leur bordure. */
+.block {
+  box-shadow: 0 1px 2px rgba(9, 60, 36, 0.04);
+}
+
+/* Espacement vertical un peu plus franc entre blocs : la respiration
+   remplace l'ombre pour séparer deux sections. */
+.mt-md {
+  margin-top: 1.1rem;
+}
+
+.mt-lg {
+  margin-top: 1.6rem;
+}
+
+/* Titre de page : un filet vert court sous le h1 ancre le haut de l'écran. */
+.page > h1 {
+  font-size: 1.5rem;
+}
+
+.page > h1::after {
+  content: "";
+  display: block;
+  width: 2.2rem;
+  height: 3px;
+  margin-top: 0.5rem;
+  border-radius: 2px;
+  background: var(--green);
+}
+
+.block h2 {
+  font-size: 0.98rem;
+  letter-spacing: -0.01em;
+}
+
+/* Tableaux : en-tête discret mais tenu, lignes respirantes, chiffres alignés
+   sur la même largeur (sinon les montants en francs dansent d'une ligne à l'autre). */
+thead th {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom-width: 2px;
+}
+
+th,
+td {
+  padding: 0.55rem 0.4rem;
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+tbody tr:hover td {
+  background: var(--surface);
+}
+
+td {
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-tile strong,
+.revue-num,
+.dcard-score {
+  font-variant-numeric: tabular-nums;
 }

@@ -1,6 +1,6 @@
 # Guide frontend — DigiScore-WA
 
-**Brief agent IA (A→Z, à coller tel quel)** : [PROMPT_AGENT_FRONTEND.md](PROMPT_AGENT_FRONTEND.md).  
+**Contrat endpoint par endpoint (capturé sur l'API live)** : [API_ENDPOINTS_REPONSES.md](API_ENDPOINTS_REPONSES.md).  
 **Note courte (auth + `.items`)** : [SYNTHESE_RESPONSABLE_FRONTEND.md](SYNTHESE_RESPONSABLE_FRONTEND.md).
 
 Tu consommes **uniquement** l’API JSON. Les formules (CAF, RCSD, EBE, score /100, plafond) sont calculées par le package `scoring` via le back. **Interdit** de les recoder dans React.
@@ -24,7 +24,7 @@ Swagger : http://localhost:8000/docs
 OpenAPI figé : [openapi.json](openapi.json)  
 Postman + scénarios : [postman/README.md](postman/README.md)
 
-Logins démo : `agent` / `chef` / `cic`, mot de passe **`demo`**.
+Logins démo : `agent` / `direct` / `cic` — mots de passe `agent`, `direct`, `cic`.
 
 Header : `Authorization: Bearer <access_token>` (réponse de `POST /auth/login`).
 
@@ -64,7 +64,7 @@ Ne charge pas 120k d’un coup. Infinite scroll / pager sur `total`.
 
 | Écran | Endpoint | Notes |
 |-------|----------|--------|
-| Login 3 rôles | `POST /auth/login` | `{ "login": "agent", "password": "demo" }` → token + `user` |
+| Login 3 rôles | `POST /auth/login` | `{ "login": "agent", "password": "agent" }` → token + `user` |
 | Lookup membre | `GET /membres?q=&page=&page_size=` | Afficher `statut` (geler = pas de nouvelle demande) |
 | Fiche | `GET /membres/{id}` | Agence, compte local, totaux, `nb_comptes_externes`, `thin_file` |
 | Historique | `GET /membres/{id}/historique` | Crédits + incidents + **30 mvts agence** + résumé ailleurs (pas un alias de la fiche) |

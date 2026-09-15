@@ -46,7 +46,7 @@ Le collègue scoring code le moteur, pas l’API. Le front n’implémente **auc
 
 Identifiants de tables/colonnes = anglais. `COMMENT ON` et **codes métier** = français (`actif` / `gele`, `brouillon`, `soumis_chef`, `soumis_cic`, N1–N3, `solde` / `impaye`).
 
-Carte complète : [../backend/db/NAMING.md](../backend/db/NAMING.md) · mapping partenaire : [mapping_si.md](mapping_si.md).
+Carte complète : [../backend/db/NAMING.md](../backend/db/NAMING.md) · API endpoint par endpoint : [API_ENDPOINTS_REPONSES.md](API_ENDPOINTS_REPONSES.md).
 
 Lookup indexés : `member.external_code`, `account.account_no`.
 

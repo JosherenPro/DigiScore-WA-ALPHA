@@ -4,7 +4,7 @@
 De : backend  
 Objet : contrat **actuel** (auth + pagination + **fiche / 2 cahiers**). Le squelette casse encore 3 écrans.
 
-Guides : [GUIDE_FRONTEND.md](GUIDE_FRONTEND.md) · brief agent : [PROMPT_AGENT_FRONTEND.md](PROMPT_AGENT_FRONTEND.md) · Swagger live : http://localhost:8000/docs · figé : [openapi.json](openapi.json) · Postman : [postman/README.md](postman/README.md).
+Guides : [GUIDE_FRONTEND.md](GUIDE_FRONTEND.md) · Swagger live : http://localhost:8000/docs · figé : [openapi.json](openapi.json) · Postman : [postman/README.md](postman/README.md).
 
 Tu ne touches pas à `backend/`, `scoring/`, `schema.sql`. Tu consommes l’API JSON **FR**.
 
@@ -51,7 +51,7 @@ Sans token → **401**. Agent sur `/files/cic` ou avis `niveau: "cic"` → **403
 
 Stocke **le token** + `user` (plus seulement `id`). Décision : `{ niveau, avis, motif, override }` — **pas** `utilisateur_id`. Soumettre : `POST /demandes/{id}/soumettre` **sans** query `utilisateur_id`.
 
-Le [PROMPT_AGENT_FRONTEND.md](PROMPT_AGENT_FRONTEND.md) est aligné (plus de `utilisateur_id`).
+Le contrat endpoint par endpoint [API_ENDPOINTS_REPONSES.md](API_ENDPOINTS_REPONSES.md) est aligné (plus de `utilisateur_id`).
 
 ---
 
@@ -108,7 +108,7 @@ Bearer obligatoire.
 | http://localhost:8000/docs | **Live** — Authorize (Bearer) puis essayer |
 | http://localhost:8000/openapi.json | Même schéma, généré par FastAPI 0.3.0 |
 | [docs/openapi.json](openapi.json) | Copie figée du repo (`python backend/scripts/export_openapi.py`) |
-| [docs/openapi.yaml](openapi.yaml) | Pointeur seulement — **ne pas** s’en servir comme contrat |
+| [docs/openapi.json](openapi.json) | Contrat figé — généré depuis le serveur lancé |
 
 En cas de conflit : **live `/docs`** > `openapi.json` > ce MD.
 

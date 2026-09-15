@@ -1,5 +1,5 @@
 -- Idempotent : volume Docker deja peuple OU premier init (apres 02_metier).
--- Mot de passe demo = "demo" (bcrypt). Relancer : psql -f 03_auth_alter.sql
+-- Mots de passe demo : agent/agent, direct/direct, cic/cic (bcrypt). Relancer : psql -f 03_auth_alter.sql
 -- ou : python backend/db/seed/migrate_auth.py
 
 ALTER TABLE app_user ADD COLUMN IF NOT EXISTS password_hash VARCHAR(128);
@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS financial_ratio_history (
     computed_at         TIMESTAMPTZ
 );
 
--- Hash bcrypt de "demo" (cost 12). Remplace par migrate_auth.py si besoin.
-UPDATE app_user SET password_hash = '$2b$12$9OfpiTAhhmsHN9nRwDdFLOf7DiSl.eSp0MhZBA0Iu8Ypca.jMW1iC'
-WHERE login IN ('agent', 'chef', 'cic') AND (password_hash IS NULL OR password_hash = '');
+-- Hash bcrypt (cost 12) : agent -> agent, direct -> direct, cic -> cic.
+-- Remplace par migrate_auth.py si besoin.
+UPDATE app_user SET password_hash = '$2b$12$UAiMHdUPGagWNb96IlnlAOLVALfthuWjmV.Zps6Y3tFfDmP/YWC4q' WHERE login = 'agent' AND (password_hash IS NULL OR password_hash = '');
+UPDATE app_user SET password_hash = '$2b$12$GNE/ytFWA6D2cXwAoQgJyuPPCZgc97UE6ryIJjSPHkrMbUB3J88Sy' WHERE login = 'direct' AND (password_hash IS NULL OR password_hash = '');
+UPDATE app_user SET password_hash = '$2b$12$pT0nytgemrYjKRsMcgpYA.moFRG5eYY0SuHpGMh63.4I3lWm6f30S' WHERE login = 'cic' AND (password_hash IS NULL OR password_hash = '');

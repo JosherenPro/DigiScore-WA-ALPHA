@@ -9,7 +9,7 @@ client = TestClient(app)
 
 
 def _headers(login: str = "agent") -> dict[str, str]:
-    token = client.post("/auth/login", json={"login": login, "password": "demo"}).json()["access_token"]
+    token = client.post("/auth/login", json={"login": login, "password": login}).json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 
 

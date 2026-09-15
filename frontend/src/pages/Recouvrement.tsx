@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   api,
   money,
@@ -21,7 +22,7 @@ const PAGE_SIZE = 30;
 const NIVEAU_INFO: Record<number, { libelle: string; periode: string; responsable: string; actions: string; tone: string }> = {
   1: { libelle: "Relance immédiate", periode: "J+1 à J+7", responsable: "Chargé de crédit", actions: "Appel J+1, visite J+3, documentation SIG", tone: "" },
   2: { libelle: "Relance renforcée", periode: "J+8 à J+30", responsable: "Chargé de crédit + Superviseur", actions: "Visite domicile, caution contactée, mise en demeure", tone: "warn" },
-  3: { libelle: "Recouvrement intensif", periode: "J+31 à J+90", responsable: "Superviseur + Chef d’agence", actions: "Convocation formelle, échéancier écrit, garanties activées", tone: "bad" },
+  3: { libelle: "Recouvrement intensif", periode: "J+31 à J+90", responsable: "Superviseur + Directeur (Chef d’Agence)", actions: "Convocation formelle, échéancier écrit, garanties activées", tone: "bad" },
   4: { libelle: "Contentieux", periode: "> J+90", responsable: "Direction / Juridique", actions: "Huissier, réalisation des garanties, action judiciaire", tone: "bad" },
 };
 
@@ -40,6 +41,35 @@ function prioriteTone(p: string): string {
   if (p === "S") return "ok";
   return "";
 }
+
+const AUJOURD_HUI = new Date().toISOString().slice(0, 10);
+
+/** Etat de la prochaine relance. Le champ `next_on` etait affiche brut : une
+ * date au 21/09 ne dit pas a l'agent qu'elle est depassee depuis trois jours. */
+function etatRelance(nextOn?: string | null): { texte: string; tone: string } | null {
+  if (!nextOn) return null;
+  if (nextOn < AUJOURD_HUI) return { texte: `Relance en retard (prévue le ${nextOn})`, tone: "bad" };
+  if (nextOn === AUJOURD_HUI) return { texte: "Relance prévue aujourd’hui", tone: "warn" };
+  return { texte: `Relance prévue le ${nextOn}`, tone: "" };
+}
+
+/** Part de l'encours deja recuperee — le seul indicateur de progres du dossier. */
+function progres(it: DossierRecouvrement): number {
+  const total = it.outstanding + it.recovered_amount;
+  return total > 0 ? Math.round((it.recovered_amount / total) * 100) : 0;
+}
+
+const ACTION_LABEL: Record<string, string> = Object.fromEntries(
+  [
+    ["appel", "Appel téléphonique"],
+    ["visite", "Visite terrain"],
+    ["courrier", "Courrier / lettre"],
+    ["mise_en_demeure", "Mise en demeure"],
+    ["promesse", "Promesse de paiement"],
+    ["huissier", "Huissier / contentieux"],
+    ["relance", "Relance"],
+  ],
+);
 
 function NiveauxTab({ d }: { d: M7Out }) {
   const counts: Record<number, number> = {};
@@ -130,6 +160,240 @@ function ActionForm({ dossier, onDone }: { dossier: DossierRecouvrement; onDone:
   );
 }
 
+/** Journal des actions deja menees sur le dossier (GET .../actions).
+ * Charge a l'ouverture : l'ecran ne montrait l'historique qu'apres avoir
+ * consigne une nouvelle action, donc jamais au moment ou il sert. */
+function Journal({
+  caseId,
+  entries,
+  onCharge,
+}: {
+  caseId: number;
+  entries?: JournalEntry[];
+  onCharge: (j: JournalEntry[]) => void;
+}) {
+  const [busy, setBusy] = useState(entries === undefined);
+
+  useEffect(() => {
+    if (entries !== undefined) return;
+    let vivant = true;
+    setBusy(true);
+    api
+      .journalRecouvrement(caseId)
+      .then((r) => {
+        if (vivant) onCharge(r.journal);
+      })
+      .catch(() => {
+        if (vivant) onCharge([]);
+      })
+      .finally(() => {
+        if (vivant) setBusy(false);
+      });
+    return () => {
+      vivant = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caseId]);
+
+  if (busy) return <Spinner />;
+  if (!entries || entries.length === 0) {
+    return <p className="muted mt-sm">Aucune action consignée jusqu’ici — ce dossier n’a encore rien reçu.</p>;
+  }
+
+  const recupere = entries.reduce((sum, j) => sum + (j.montant || 0), 0);
+
+  return (
+    <div className="rec-journal mt-sm">
+      <p className="hint">
+        Historique — {entries.length} action{entries.length > 1 ? "s" : ""}
+        {recupere > 0 ? ` · ${money(recupere)} encaissés` : ""}
+      </p>
+      <ol className="rec-journal-list">
+        {entries.map((j, i) => (
+          <li key={i}>
+            <span className="rec-journal-date">{j.date || "—"}</span>
+            <span>
+              <strong>{ACTION_LABEL[j.type] || j.type}</strong>
+              {j.montant ? <span className="badge rect ok">{money(j.montant)}</span> : null}
+              {j.note && <div className="muted">{j.note}</div>}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+/** Un client et ses dossiers de recouvrement.
+ *
+ * A plat, un membre qui accumule les retards remplit l'ecran de cartes et noie
+ * les autres clients. L'ordre d'arrivee de l'API est conserve : le premier
+ * dossier d'un membre fixe la position de son lot, on ne rebat pas le tri au
+ * profit d'un ordre alphabetique.
+ */
+type LotClient = {
+  membreId: number;
+  nom: string;
+  code: string;
+  dossiers: DossierRecouvrement[];
+  outstanding: number;
+  recovered: number;
+  enRetard: boolean;
+};
+
+function grouperParClient(items: DossierRecouvrement[]): LotClient[] {
+  const lots = new Map<number, LotClient>();
+  for (const it of items) {
+    let lot = lots.get(it.member_id);
+    if (!lot) {
+      lot = {
+        membreId: it.member_id,
+        nom: it.member_name || `membre #${it.member_id}`,
+        code: it.member_code,
+        dossiers: [],
+        outstanding: 0,
+        recovered: 0,
+        enRetard: false,
+      };
+      lots.set(it.member_id, lot);
+    }
+    lot.dossiers.push(it);
+    lot.outstanding += it.outstanding || 0;
+    lot.recovered += it.recovered_amount || 0;
+    // Une relance en retard sur l'un des dossiers = client prioritaire.
+    if (etatRelance(it.next_on)?.tone === "bad") lot.enRetard = true;
+  }
+  return [...lots.values()];
+}
+
+/** Un client et tous ses dossiers de recouvrement, repliable.
+ *
+ * La carte du lot porte le total de l'encours du client et son retard maximal :
+ * c'est l'information qui fait choisir par quel client commencer la tournée. */
+function LotDossiers({
+  lot,
+  ouvertCase,
+  setOuvertCase,
+  journals,
+  setJournals,
+}: {
+  lot: LotClient;
+  ouvertCase: number | null;
+  setOuvertCase: (id: number | null) => void;
+  journals: Record<number, JournalEntry[]>;
+  setJournals: React.Dispatch<React.SetStateAction<Record<number, JournalEntry[]>>>;
+}) {
+  const [ouvert, setOuvert] = useState(lot.dossiers.length === 1);
+  const retardMax = Math.max(...lot.dossiers.map((d) => d.days_late || 0));
+  return (
+    <section className={`lot${lot.enRetard ? " en-retard" : ""}`}>
+      <div className="lot-head">
+        <button
+          type="button"
+          className="lot-toggle"
+          aria-expanded={ouvert}
+          onClick={() => setOuvert((v) => !v)}
+        >
+          <span className={`lot-chevron${ouvert ? " open" : ""}`} aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </span>
+          <span className="lot-id">
+            <strong>{lot.nom}</strong>
+            <span className="muted">
+              {lot.code} · {lot.dossiers.length} dossier{lot.dossiers.length > 1 ? "s" : ""} ·{" "}
+              {money(lot.outstanding)} restants
+              {retardMax > 0 ? ` · retard max ${retardMax} j` : ""}
+            </span>
+          </span>
+        </button>
+        <div className="lot-actions">
+          <Link className="btn ghost sm" to={`/membres/${lot.membreId}`}>
+            Fiche
+          </Link>
+          <Link className="btn primary sm" to={`/membres/${lot.membreId}/demande`}>
+            Nouveau crédit
+          </Link>
+        </div>
+      </div>
+      {ouvert && (
+        <div className="list lot-cards">
+          {lot.dossiers.map((it) => (
+            <CarteDossier
+              key={it.case_id}
+              it={it}
+              ouvert={ouvertCase === it.case_id}
+              onToggle={() => setOuvertCase(ouvertCase === it.case_id ? null : it.case_id)}
+              journal={journals[it.case_id]}
+              onJournal={(j) => setJournals((m) => ({ ...m, [it.case_id]: j }))}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** Une ligne de prêt au sein du lot d'un client (journal + formulaire). */
+function CarteDossier({
+  it,
+  ouvert,
+  onToggle,
+  journal,
+  onJournal,
+}: {
+  it: DossierRecouvrement;
+  ouvert: boolean;
+  onToggle: () => void;
+  journal?: JournalEntry[];
+  onJournal: (j: JournalEntry[]) => void;
+}) {
+  const relance = etatRelance(it.next_on);
+  const pct = progres(it);
+  return (
+    <div className={`visite-card${relance?.tone === "bad" ? " en-retard" : ""}`}>
+      <div className="visite-row">
+        <div>
+          <span className="badge rect">Prêt #{it.case_id}</span>
+          <div className="muted">
+            {money(it.outstanding)} restant · {it.days_late} j de retard
+            {it.responsable ? ` · ${it.responsable}` : ""}
+          </div>
+          {relance && <div className={`rec-relance ${relance.tone}`}>{relance.texte}</div>}
+        </div>
+        <span className="badge rect">N{it.niveau} — {it.libelle}</span>
+        <span className={`badge rect ${prioriteTone(it.priorite)}`}>{it.priorite}</span>
+        <button className="btn ghost sm" type="button" onClick={onToggle}>
+          {ouvert ? "Fermer" : "Ouvrir le dossier"}
+        </button>
+      </div>
+
+      {/* Progres du recouvrement : sans lui, deux dossiers au meme encours se
+          ressemblent, alors que l'un rembourse et pas l'autre. */}
+      {it.recovered_amount > 0 && (
+        <div className="rec-progres">
+          <span className="rec-progres-track">
+            <span className="rec-progres-fill" style={{ width: `${Math.min(pct, 100)}%` }} />
+          </span>
+          <span className="muted">
+            {money(it.recovered_amount)} récupérés · {pct} % de la créance
+          </span>
+        </div>
+      )}
+
+      {ouvert && (
+        <>
+          {/* Le journal se charge a l'ouverture : on ne relance pas un membre
+              sans savoir ce qui a deja ete tente. */}
+          <Journal caseId={it.case_id} entries={journal} onCharge={onJournal} />
+          <ActionForm dossier={it} onDone={onJournal} />
+        </>
+      )}
+    </div>
+  );
+}
+
 function DossiersTab({ search }: { search: string }) {
   const [niveau, setNiveau] = useState<number | null>(null);
   const [priorite, setPriorite] = useState<string | null>(null);
@@ -171,6 +435,9 @@ function DossiersTab({ search }: { search: string }) {
           </button>
         ))}
       </div>
+      <p className="hint">
+        P1 = encours &gt; 2 M et retard &gt; 8 j · P2 = retard &gt; 30 j · P3 = suivi courant · S = à jour.
+      </p>
       <div className="tabs mt-sm">
         {[null, "P1", "P2", "P3", "S"].map((p) => (
           <button
@@ -188,50 +455,16 @@ function DossiersTab({ search }: { search: string }) {
       {busy && <Spinner />}
       {!busy && items.length === 0 && !err && <p className="muted">Aucun dossier{search ? " pour cette recherche" : ""}.</p>}
 
-      <div className="list">
-        {items.map((it) => (
-          <div className="visite-card" key={it.case_id}>
-            <div className="visite-row">
-              <div>
-                <strong>{it.member_code}</strong>
-                <div className="muted">
-                  {money(it.outstanding)} · {it.days_late} j de retard
-                  {it.next_on ? ` · prochaine relance ${it.next_on}` : ""}
-                  {it.recovered_amount > 0 ? ` · ${money(it.recovered_amount)} déjà récupéré` : ""}
-                </div>
-              </div>
-              <span className="badge rect">Niveau {it.niveau}</span>
-              <span className={`badge rect ${prioriteTone(it.priorite)}`}>{it.priorite}</span>
-              <button
-                className="btn ghost sm"
-                type="button"
-                onClick={() => setOpenCase(openCase === it.case_id ? null : it.case_id)}
-              >
-                {openCase === it.case_id ? "Fermer" : "Consigner une action"}
-              </button>
-            </div>
-            {openCase === it.case_id && (
-              <ActionForm
-                dossier={it}
-                onDone={(journal) => {
-                  setOpenCase(null);
-                  setJournals((j) => ({ ...j, [it.case_id]: journal }));
-                }}
-              />
-            )}
-            {journals[it.case_id] && journals[it.case_id].length > 0 && (
-              <div className="mt-sm">
-                <p className="hint">Journal du dossier</p>
-                {journals[it.case_id].map((j, i) => (
-                  <div className="muted" key={i} style={{ fontSize: "0.85rem" }}>
-                    {j.date} · {j.type}
-                    {j.montant ? ` · ${money(j.montant)}` : ""}
-                    {j.note ? ` — ${j.note}` : ""}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+      <div className="lots">
+        {grouperParClient(items).map((lot) => (
+          <LotDossiers
+            key={lot.membreId}
+            lot={lot}
+            ouvertCase={openCase}
+            setOuvertCase={setOpenCase}
+            journals={journals}
+            setJournals={setJournals}
+          />
         ))}
       </div>
       {data && <Pager page={data.page} pageSize={data.page_size} total={data.total} onPage={setPage} />}
@@ -250,7 +483,11 @@ export default function Recouvrement() {
   return (
     <div className="page">
       <h1>Recouvrement</h1>
-      <p className="lede">4 niveaux d’escalade selon le retard — dossiers, priorité et journal d’actions.</p>
+      <p className="lede">
+        4 niveaux d’escalade selon le retard : <strong>N1</strong> J+1 à J+7 (appel, visite),
+        <strong> N2</strong> J+8 à J+30 (domicile, caution), <strong>N3</strong> J+31 à J+90 (mise en demeure),
+        <strong> N4</strong> au-delà (contentieux). Chaque action est consignée au journal du dossier.
+      </p>
 
       <div className="tabs">
         <button type="button" className={`tab${tab === "niveaux" ? " active" : ""}`} onClick={() => setTab("niveaux")}>
@@ -269,7 +506,7 @@ export default function Recouvrement() {
       </div>
 
       {tab === "dossiers" && (
-        <PageSearch value={search} onChange={setSearch} placeholder="Rechercher un membre (code)…" />
+        <PageSearch value={search} onChange={setSearch} placeholder="Rechercher un membre (nom ou code)…" />
       )}
 
       {tab === "niveaux" && <NiveauxTab d={d} />}

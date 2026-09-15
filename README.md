@@ -29,6 +29,15 @@ cd frontend && npm install && npm run dev
 
 Compose lance **Postgres + Adminer + db-seed**. L’API n’est pas dans Compose.
 
+Tests (nécessitent Postgres lancé) :
+
+```bash
+PYTHONPATH=scoring:backend python -m pytest backend/tests -q
+```
+
+La suite tourne avec ou sans `ML_ENABLED` — les capacités ML sont pilotées par
+la variable dans le test, pas héritées du shell.
+
 - Premier `up` : long si génération 120k CSV v2 (histoires uniques) + COPY. CSV gitignorés. Laptop : `VOLUME_MEMBERS=5000 docker compose up -d`.
 - `up` suivants : instantanés si `seed_meta.volume_loaded=v2`. Volume v1 : `docker compose down -v` puis `up`.
 - `LOAD_VOLUME=0` : 12 profils démo seulement.
@@ -42,7 +51,7 @@ Compose lance **Postgres + Adminer + db-seed**. L’API n’est pas dans Compose
 
 `.env` : `DATABASE_URL`, `VITE_API_URL` — copier [.env.example](.env.example).
 
-Logins démo : `agent` / `chef` / `cic`, mot de passe **`demo`**. Header `Authorization: Bearer <token>`.
+Logins démo : `agent` / `direct` / `cic` — mots de passe `agent`, `direct`, `cic`. Header `Authorization: Bearer <token>`.
 
 Sécu SI (pilote, pas de code) : [docs/SECURITE_ECHANGES_PILOTE.md](docs/SECURITE_ECHANGES_PILOTE.md).
 
@@ -55,6 +64,37 @@ Sécu SI (pilote, pas de code) : [docs/SECURITE_ECHANGES_PILOTE.md](docs/SECURIT
 | MEM-009 Isaac Gbeglo | 10 M + cautions → file **CIC** voie exceptionnelle |
 | MEM-010 Compte Gele | Compte gelé → aucune demande |
 
+## Écrans par rôle
+
+| Rôle | Atterrissage | Écrans |
+|------|--------------|--------|
+| Agent | `/dashboard` | Dossiers (`/demandes`, filtres brouillon / **à corriger** / en cours / historique), fiche membre, wizard de collecte, résultat, mémo + échéancier, suivi terrain, portefeuille, recouvrement |
+| Chef d’agence | `/revue` | **Espace chef** (charge à signer, PAR, priorités de recouvrement), file chef, portefeuille, recouvrement |
+| CIC | `/revue` | **Espace CIC**, file CIC, file chef, portefeuille, recouvrement |
+| Tous (sans connexion) | — | [`/politique`](frontend/src/pages/Politique.tsx) — protection des données, confidentialité, auditabilité, conformité BCEAO |
+
+### Boucle de correction
+
+Un dossier renvoyé par le chef repart : bannière avec le motif du renvoi →
+`/demandes/:id/modifier` (le wizard rouvre le dossier avec ses données) →
+`PATCH /demandes/:id` → relance de l’analyse → resoumission. Côté API,
+l’écriture est refusée (**409**) dès que le dossier est engagé en décision.
+
+## Endpoints ajoutés
+
+| Route | Rôle |
+|-------|------|
+| `PATCH /demandes/{id}` | Corriger une demande encore ouverte (agent) |
+| `GET /demandes/{id}/collecte` | Collecte **complète**, au format attendu par l’écriture |
+| `GET /demandes/{id}/audit` | Piste d’audit — qui, quoi, quand, motif |
+| `GET /vision/recouvrement/{case_id}/actions` | Journal d’un dossier, **avant** d’agir |
+| `GET /vision/signaux` | Grille des 12 signaux d’alerte FUCEC |
+| `POST /vision/par/recalcul` | Recalcul du PAR (chef / CIC) |
+
+Les listes de portefeuille (`/portefeuille/alertes`, `/vision/echeances`,
+`/vision/visites`, `/vision/recouvrement/dossiers`) renvoient `member_name` en
+plus de `member_code` : un code de génération ne se prononce pas au téléphone.
+
 ## Guides collègues
 
 | Fichier | Public |
@@ -62,7 +102,6 @@ Sécu SI (pilote, pas de code) : [docs/SECURITE_ECHANGES_PILOTE.md](docs/SECURIT
 | [docs/ARCHI.md](docs/ARCHI.md) | Tous — sidecar, ports, flux, IN/OUT |
 | [docs/GUIDE_SCORING.md](docs/GUIDE_SCORING.md) | Moteur — contrat `DossierInput` / `ScoreResult`, pas de SQL |
 | [docs/GUIDE_FRONTEND.md](docs/GUIDE_FRONTEND.md) | UI — clés JSON, pagination, pages → endpoints |
-| [docs/PROMPT_AGENT_FRONTEND.md](docs/PROMPT_AGENT_FRONTEND.md) | Brief à coller dans l’agent IA du front |
 | [docs/SYNTHESE_RESPONSABLE_FRONTEND.md](docs/SYNTHESE_RESPONSABLE_FRONTEND.md) | Note front — Bearer, `.items`, mapping écrans |
 | [docs/SYNTHESE_RESPONSABLE_SCORING.md](docs/SYNTHESE_RESPONSABLE_SCORING.md) | Note scoring — 14 bugs à eux, ML masqué |
 | [docs/DONNEES_RESPONSABLE_MODELE.md](docs/DONNEES_RESPONSABLE_MODELE.md) | Scoring — mix 120k, deux cahiers, dates, reco vs décision |
@@ -78,10 +117,12 @@ Sécu SI (pilote, pas de code) : [docs/SECURITE_ECHANGES_PILOTE.md](docs/SECURIT
 | H8–H24 | UI membre + collecte + CAF/RCSD |
 | H24–H40 | Score + plafond + messages |
 | H40–H52 | Mémo, décision, amortissement |
-| H52–H60 | Maquettes M6/M7 |
+| H52–H60 | M6/M7 calculés depuis les encours réels |
 | H60–gel | E2E + pitch |
 
-**IN 72 h** : M1–M5, 12 profils, 3 rôles, sidecar documenté. **OUT** : core banking / BIC / Flooz live, ML réel, M6/M7 temps réel, SSO, i18n éwé.
+**IN 72 h** : M1–M5, 12 profils, 3 rôles, sidecar documenté. **OUT** : core banking / BIC / Flooz live, ML réel entraîné sur données de production, SSO, i18n éwé.
+M6/M7 ne sont plus des maquettes : PAR 1/30/90, balance âgée, niveaux de recouvrement et
+visites de suivi sont calculés à partir de la table des encours.
 
 ## Contraintes CIF
 
@@ -99,6 +140,6 @@ Sécu SI (pilote, pas de code) : [docs/SECURITE_ECHANGES_PILOTE.md](docs/SECURIT
 
 ## Docs
 
-- [CDC](docs/CDC_DigiScore-WA_complet.md) · [Guide équipe](docs/GUIDE_EQUIPE.md) · [Architecture (court)](docs/architecture.md)
-- [Mapping SI](docs/mapping_si.md) · [Workflow](docs/workflow-roles.md) · [Pitch](docs/PITCH_DIFFERENCIATION.md)
-- [SPEC scoring](scoring/SPEC.md) · [OpenAPI](docs/openapi.json)
+- [Guide équipe](docs/GUIDE_EQUIPE.md) · [Architecture](docs/ARCHI.md) · [API endpoint par endpoint](docs/API_ENDPOINTS_REPONSES.md)
+- [Guide ML](docs/GUIDE_ML_BACKEND_DATA.md) · [Variables modèles ML](docs/VARIABLES_MODELES_ML.md) · [Pitch](docs/pitch/DEMO_LIVE.md)
+- [SPEC scoring](scoring/SPEC.md) · [OpenAPI](docs/openapi.json) · [Jury (PDF)](docs/JURY_SCORING.pdf)

@@ -24,6 +24,7 @@ class EcheanceOut(BaseModel):
     outstanding_loan_id: int
     member_id: int
     member_code: str
+    member_name: str = ""
     outstanding: float
     days_late: int
     due_on: str | None = None
@@ -47,6 +48,7 @@ class VisiteAFaireOut(BaseModel):
     outstanding_loan_id: int
     member_id: int
     member_code: str
+    member_name: str = ""
     visite: str
     cible: str
     jours_de_retard: int
@@ -85,6 +87,7 @@ class DossierRecouvrementRichOut(BaseModel):
     case_id: int
     member_id: int
     member_code: str
+    member_name: str = ""
     niveau: int
     libelle: str
     action: str

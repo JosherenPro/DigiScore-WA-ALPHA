@@ -15,6 +15,8 @@ import FileCic from "./pages/FileCic";
 import Portefeuille from "./pages/Portefeuille";
 import Recouvrement from "./pages/Recouvrement";
 import Suivi from "./pages/Suivi";
+import Revue from "./pages/Revue";
+import Politique from "./pages/Politique";
 
 function RoleGate({ allow, children }: { allow: string[]; children: ReactNode }) {
   const user = getUser();
@@ -60,6 +62,12 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M15 7h6v6" />
     </svg>
   ),
+  revue: (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M9 11l3 3L22 4" />
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+    </svg>
+  ),
   file: (
     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M22 12h-6l-2 3h-4l-2-3H2" />
@@ -79,12 +87,17 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { to: "/m7", label: "Recouvrement", icon: "recouvrement" },
   ],
   chef_agence: [
+    { to: "/revue", label: "Espace chef", icon: "revue" },
     { to: "/chef", label: "File chef", icon: "file" },
+    { to: "/demandes", label: "Dossiers", icon: "dossiers" },
     { to: "/m6", label: "Portefeuille", icon: "portefeuille" },
     { to: "/m7", label: "Recouvrement", icon: "recouvrement" },
   ],
   cic: [
+    { to: "/revue", label: "Espace CIC", icon: "revue" },
     { to: "/cic", label: "File CIC", icon: "file" },
+    { to: "/chef", label: "File chef", icon: "file" },
+    { to: "/demandes", label: "Dossiers", icon: "dossiers" },
     { to: "/m6", label: "Portefeuille", icon: "portefeuille" },
     { to: "/m7", label: "Recouvrement", icon: "recouvrement" },
   ],
@@ -166,6 +179,9 @@ function Shell({ children }: { children: ReactNode }) {
           <NavLinks role={role} />
         </nav>
         <div className="sidebar-user">
+          <NavLink className="sidebar-policy" to="/politique">
+            Politique d’utilisation
+          </NavLink>
           <span>{user.nom} · {role.replace("_", " ")}</span>
           <button className="btn ghost sm" type="button" onClick={logout}>
             Sortir
@@ -195,6 +211,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Login />} />
+      <Route path="/politique" element={<Politique />} />
       <Route path="/agent" element={<Shell><AgentHome /></Shell>} />
       <Route
         path="/dashboard"
@@ -219,6 +236,16 @@ export default function App() {
       />
       <Route path="/demandes" element={<Shell><AgentHome dossiers /></Shell>} />
       <Route path="/demandes/:id" element={<Shell><Resultat /></Shell>} />
+      <Route
+        path="/demandes/:id/modifier"
+        element={
+          <Shell>
+            <RoleGate allow={["agent"]}>
+              <DemandeWizard edition />
+            </RoleGate>
+          </Shell>
+        }
+      />
       <Route path="/demandes/:id/memo" element={<Shell><Memo /></Shell>} />
       <Route
         path="/chef"
@@ -236,6 +263,16 @@ export default function App() {
           <Shell>
             <RoleGate allow={["cic"]}>
               <FileCic />
+            </RoleGate>
+          </Shell>
+        }
+      />
+      <Route
+        path="/revue"
+        element={
+          <Shell>
+            <RoleGate allow={["chef_agence", "cic"]}>
+              <Revue />
             </RoleGate>
           </Shell>
         }

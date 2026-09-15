@@ -12,6 +12,24 @@ function apiBase(): string {
 
 const BASE = apiBase();
 
+/** Fin de session côté client.
+ *
+ * Vider sessionStorage ne suffisait pas : l'écran affiché restait monté, et
+ * l'agent se retrouvait devant une page morte où chaque action échouait, sans
+ * autre issue que de recharger à la main. On le ramène à la connexion.
+ *
+ * `avaitJeton` distingue une session expirée d'un échec de connexion : un
+ * mauvais mot de passe renvoie aussi 401, et l'utilisateur doit alors voir le
+ * message d'erreur sur le formulaire, pas être rechargé en boucle.
+ */
+function finDeSession(avaitJeton: boolean): void {
+  sessionStorage.removeItem("digiscore_token");
+  sessionStorage.removeItem("digiscore_user");
+  if (!avaitJeton || typeof window === "undefined") return;
+  if (window.location.pathname === "/") return;
+  window.location.assign("/");
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -64,10 +82,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   } catch {
     throw new ApiError(0, "Lance uvicorn :8000 (API indisponible).");
   }
-  if (res.status === 401) {
-    sessionStorage.removeItem("digiscore_token");
-    sessionStorage.removeItem("digiscore_user");
-  }
+  if (res.status === 401) finDeSession(!!t);
   if (!res.ok) throw new ApiError(res.status, await parseError(res));
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
@@ -85,10 +100,7 @@ async function reqForm<T>(path: string, form: FormData): Promise<T> {
   } catch {
     throw new ApiError(0, "Lance uvicorn :8000 (API indisponible).");
   }
-  if (res.status === 401) {
-    sessionStorage.removeItem("digiscore_token");
-    sessionStorage.removeItem("digiscore_user");
-  }
+  if (res.status === 401) finDeSession(!!t);
   if (!res.ok) throw new ApiError(res.status, await parseError(res));
   return res.json() as Promise<T>;
 }
@@ -264,11 +276,18 @@ export type DemandeDetail = {
   duree_mois: number;
   statut: string;
   situation_fiscale: string;
-  membre?: { id: number; code_externe: string; nom: string; prenom: string } | null;
+  membre?: { id: number; code_externe: string; nom: string; prenom: string; statut?: string } | null;
   produit?: { id: number; code: string; libelle: string; exceptionnel: boolean } | null;
   score: ScoreOut | null;
   ratios: { caf: number; rcsd: number; ebe: number } | null;
-  decisions: { niveau: string; avis: string; motif: string | null; override: boolean }[];
+  decisions: {
+    niveau: string;
+    avis: string;
+    motif: string | null;
+    override: boolean;
+    auteur?: string | null;
+    date?: string | null;
+  }[];
   pieces: { type_piece: string; qualite_ocr?: string | null; fichier?: string | null }[];
   cautions: Caution[];
   collecte?: Record<string, unknown> | null;
@@ -277,6 +296,11 @@ export type DemandeDetail = {
   menage?: { taille: number; logement: string; charges: number } | null;
   activite?: { type: string; saisonnier: boolean; description?: string } | null;
 };
+
+// Retour de POST /demandes/:id/decision — `statut` peut differer de l'avis
+// signe : un « valider » chef sur un dossier hors delegation ressort en
+// `soumis_cic`. L'ecran doit annoncer le statut reel, pas l'intention.
+export type DecisionResult = { statut: string; override: boolean };
 
 export type MemoOut = {
   titre: string;
@@ -289,16 +313,59 @@ export type MemoOut = {
   analyse: { caf: number; rcsd: number; ebe: number } | null;
 };
 
+export type AmortLigne = {
+  numero?: number;
+  /** Mensualite hors assurance (B11). Ce n'est PAS ce que le membre debourse. */
+  echeance?: number;
+  capital?: number;
+  interet?: number;
+  assurance?: number;
+  /** Ce que le membre paie reellement ce mois-la : echeance + assurance (B13). */
+  echeance_totale?: number;
+  restant?: number;
+  due_on?: string | null;
+  [k: string]: unknown;
+};
+
 export type AmortOut = {
   montant: number;
   duree_mois: number;
-  lignes: { numero?: number; echeance?: number; capital?: number; interet?: number; restant?: number; [k: string]: unknown }[];
+  taux_nominal: number;
+  taux_assurance: number;
+  mensualite_hors_assurance: number;
+  assurance_mensuelle: number;
+  mensualite_totale: number;
+  cout_total: number;
+  total_a_rembourser: number;
+  lignes: AmortLigne[];
+};
+
+export type ParAgence = {
+  agence_id?: number | null;
+  par1: number;
+  par30: number;
+  par90: number;
+  encours_brut?: number;
+  label?: string | null;
+};
+
+// L'alerte M6 porte déjà le code membre, le niveau N1..N3 et la priorité P1/P2 :
+// les afficher évite de renvoyer l'agent chercher l'identité derrière un id nu.
+export type AlerteM6 = {
+  signal: string;
+  membre_id: number;
+  member_code?: string | null;
+  member_name?: string;
+  days_late?: number | null;
+  niveau?: number | null;
+  priorite?: string | null;
 };
 
 export type M6Out = {
   module?: string;
-  par: { agence_id?: number | null; par30: number; par90: number }[];
-  alertes: { signal: string; membre_id: number }[];
+  as_of?: string;
+  par: ParAgence[];
+  alertes: AlerteM6[];
 };
 
 export type M7Out = {
@@ -322,6 +389,7 @@ export type Echeance = {
   outstanding_loan_id: number;
   member_id: number;
   member_code: string;
+  member_name?: string;
   outstanding: number;
   days_late: number;
   due_on: string | null;
@@ -339,6 +407,7 @@ export type DossierRecouvrement = {
   case_id: number;
   member_id: number;
   member_code: string;
+  member_name?: string;
   niveau: number;
   libelle: string;
   action: string;
@@ -387,6 +456,7 @@ export type VisiteAFaire = {
   outstanding_loan_id: number;
   member_id: number;
   member_code: string;
+  member_name?: string;
   visite: string;
   cible: string;
   jours_de_retard: number;
@@ -503,7 +573,9 @@ export type SimulationSavedOut = SimulationOut & { id: number; created_at: strin
 
 export type AlertePortefeuille = {
   application_id?: number | null;
+  member_id?: number | null;
   member_code: string;
+  member_name?: string;
   p_par30_90j: number;
   exposure: number;
   days_late?: number;
@@ -533,6 +605,70 @@ export type CollecteBody = {
   saisonnier: boolean;
   type_activite: string;
   valeur_garanties: number;
+};
+
+// ---- Référentiel des signaux d'alerte FUCEC (GET /vision/signaux) ----------
+// Grille métier de la Section 5 : ce que l'agent doit savoir repérer sur le
+// terrain. Statique côté backend, mais c'est la légende qui rend lisibles les
+// `signal` bruts renvoyés par M6/M7 et le suivi.
+export type SignalFucec = { code: string; famille: string; libelle: string };
+
+export type SignauxOut = { model_version: string; items: SignalFucec[] };
+
+// Le snapshot renvoye par le recalcul garde les noms de colonnes SQL
+// (agency_id, restructured_amount) — ne pas les franciser ici a tort.
+export type ParSnapshot = {
+  as_of: string;
+  agency_id?: number | null;
+  par1: number;
+  par30: number;
+  par90: number;
+  encours_brut?: number;
+  restructured_amount?: number;
+};
+
+export type ParRecalculOut = { as_of: string; snapshots: ParSnapshot[] };
+
+export type AuditEntry = {
+  action: string;
+  detail?: string | null;
+  auteur?: string | null;
+  date?: string | null;
+};
+
+export type BicOut = {
+  consentement: { statut: string; signe_le?: string | null; scan?: string | null } | null;
+  rapport: {
+    nb_credits_externes: number;
+    nb_incidents: number;
+    synthese?: string | null;
+    source?: string | null;
+  } | null;
+};
+
+export type PretEnCours = {
+  principal: number;
+  encours: number;
+  jours_retard: number;
+  statut: string;
+  decaissement?: string | null;
+  echeance?: string | null;
+  observation?: string | null;
+};
+
+export type SuiviMembre = {
+  visite: string;
+  date?: string | null;
+  jours_retard?: number | null;
+  signal?: string | null;
+};
+
+export type RecouvrementMembre = {
+  niveau: number;
+  action?: string | null;
+  responsable?: string | null;
+  ouvert_le?: string | null;
+  journal: { date?: string | null; type: string; note?: string | null }[];
 };
 
 function qs(params: Record<string, string | number | undefined>): string {
@@ -581,6 +717,13 @@ export const api = {
   demandeStats: (agentId?: number) => req<DemandeStats>(`/demandes/stats${qs({ agent_id: agentId })}`),
   createDemande: (body: Record<string, unknown>) =>
     req<{ id: number; statut: string }>("/demandes", { method: "POST", body: JSON.stringify(body) }),
+  collecteComplete: (id: number) =>
+    req<{ complete: CollecteBody }>(`/demandes/${id}/collecte`),
+  modifierDemande: (id: number, body: Record<string, unknown>) =>
+    req<{ id: number; statut: string }>(`/demandes/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
   collecte: (id: number, body: CollecteBody) =>
     req(`/demandes/${id}/collecte`, { method: "POST", body: JSON.stringify(body) }),
   piece: (id: number, body: { type_piece: string; qualite_ocr: string; fichier?: string }) =>
@@ -595,7 +738,7 @@ export const api = {
   analyser: (id: number) => req<ScoreOut>(`/demandes/${id}/analyser`, { method: "POST" }),
   soumettre: (id: number) => req<{ statut: string; file: string }>(`/demandes/${id}/soumettre`, { method: "POST" }),
   decision: (id: number, body: { niveau: string; avis: string; motif?: string | null; override?: boolean }) =>
-    req(`/demandes/${id}/decision`, { method: "POST", body: JSON.stringify(body) }),
+    req<DecisionResult>(`/demandes/${id}/decision`, { method: "POST", body: JSON.stringify(body) }),
   memo: (id: number) => req<MemoOut>(`/demandes/${id}/memo`),
   amortissement: (id: number) => req<AmortOut>(`/demandes/${id}/amortissement`),
   scores: (id: number) => req<ScoreOut[]>(`/demandes/${id}/scores`),
@@ -618,6 +761,8 @@ export const api = {
         page_size: opts?.pageSize ?? 30,
       })}`,
     ),
+  journalRecouvrement: (caseId: number) =>
+    req<ActionRecouvrementOut>(`/vision/recouvrement/${caseId}/actions`),
   logActionRecouvrement: (caseId: number, body: ActionRecouvrementIn) =>
     req<ActionRecouvrementOut>(`/vision/recouvrement/${caseId}/actions`, { method: "POST", body: JSON.stringify(body) }),
   visites: (limit = 50) => req<VisitesOut>(`/vision/visites${qs({ limit })}`),
@@ -633,6 +778,20 @@ export const api = {
     req<SimulationSavedOut>(`/demandes/${id}/simulation/enregistrer`, { method: "POST", body: JSON.stringify(body) }),
   simulations: (id: number) => req<SimulationSavedOut[]>(`/demandes/${id}/simulations`),
   alertesPortefeuille: (limit = 20) => req<AlertesPortefeuilleOut>(`/portefeuille/alertes${qs({ limit })}`),
+
+  // Référentiel métier + recalcul PAR (M6) et traçabilité dossier.
+  signaux: () => req<SignauxOut>("/vision/signaux"),
+  recalculPar: (asOf?: string) =>
+    req<ParRecalculOut>(`/vision/par/recalcul${qs({ as_of: asOf })}`, { method: "POST" }),
+  audit: (id: number) => req<AuditEntry[]>(`/demandes/${id}/audit`),
+
+  // Fiche membre — sous-ressources (BIC, encours, suivi terrain, recouvrement).
+  membreBic: (id: number) => req<BicOut>(`/membres/${id}/bic`),
+  membrePrets: (id: number) => req<PretEnCours[]>(`/membres/${id}/prets`),
+  membreSuivi: (id: number) => req<SuiviMembre[]>(`/membres/${id}/suivi`),
+  membreRecouvrement: (id: number) => req<RecouvrementMembre[]>(`/membres/${id}/recouvrement`),
+  membreDemandes: (id: number, page = 1, pageSize = 10) =>
+    req<Page<DemandeResume>>(`/membres/${id}/demandes${qs({ page, page_size: pageSize })}`),
 };
 
 export const money = (n: number) =>

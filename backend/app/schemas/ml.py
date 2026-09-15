@@ -60,6 +60,8 @@ class SimulationSavedOut(SimulationOut):
 class AlerteOut(BaseModel):
     application_id: int | None = None
     member_code: str
+    member_name: str = ""
+    member_id: int | None = None
     p_par30_90j: float
     exposure: float
     days_late: int

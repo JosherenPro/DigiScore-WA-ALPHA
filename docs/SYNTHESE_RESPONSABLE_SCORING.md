@@ -6,7 +6,7 @@ Objet : ce que le back a figé, ce qui est **à toi**, ce que plus de CSV ne ré
 
 Le moteur **règles** (`digiscore.pipeline.run`) est la seule décision exposée à la démo. Le ML n’est pas branché. On n’a **pas** modifié `scoring/` volontairement.
 
-Contrat inchangé : [GUIDE_SCORING.md](GUIDE_SCORING.md) · [scoring/SPEC.md](../scoring/SPEC.md). Revue détaillée : [RECOMMANDATIONS_BACKEND.md](RECOMMANDATIONS_BACKEND.md) (annexe). **Données enrichies (mix 120k, deux cahiers, dates)** : [DONNEES_RESPONSABLE_MODELE.md](DONNEES_RESPONSABLE_MODELE.md). Plan interne data : [PLAN_ROBUSTESSE_DONNEES.md](PLAN_ROBUSTESSE_DONNEES.md).
+Contrat inchangé : [GUIDE_SCORING.md](GUIDE_SCORING.md) · [scoring/SPEC.md](../scoring/SPEC.md). **Données enrichies (mix 120k, deux cahiers, dates)** : [DONNEES_RESPONSABLE_MODELE.md](DONNEES_RESPONSABLE_MODELE.md). Plan interne data : [PLAN_ROBUSTESSE_DONNEES.md](PLAN_ROBUSTESSE_DONNEES.md).
 
 ---
 

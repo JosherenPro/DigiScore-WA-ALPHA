@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, Link } from "react-router-dom";
 import { api, type CollecteBody, type MembreDetail, type Produit } from "../api/client";
 import Alert from "../components/Alert";
+import Spinner from "../components/Spinner";
 
 const STEPS = ["Demande", "Activité", "Exploitation", "Bilan", "Preuves"];
+
+// Statuts ou le dossier appartient encore a l'agent (miroir de
+// STATUTS_MODIFIABLES cote API, routes.py).
+const MODIFIABLES = ["brouillon", "analyse", "renvoye"];
 
 // Repère affiché dans le panneau latéral pour chaque étape — texte
 // d'aide fixe (aucune donnée), aligné sur STEPS.
@@ -51,7 +56,7 @@ const empty: CollecteBody & {
   preuve_revenu: "",
   preuve_charge: "",
   saisonnier: false,
-  type_activite: "commerce",
+  type_activite: "tertiaire",
   valeur_garanties: 0,
 };
 
@@ -66,10 +71,21 @@ const PREUVE_HELP: Record<string, string> = {
   N3: "Fort — document officiel vérifiable",
 };
 
-export default function DemandeWizard() {
+/** Assistant de collecte A–E.
+ *
+ * Deux usages pour un meme formulaire : creation (`/membres/:id/demande`, `id`
+ * = le membre) et correction (`/demandes/:id/modifier`, `id` = le dossier).
+ * Un dossier renvoye par le chef n'avait aucun ecran pour etre corrige : on
+ * pouvait le resoumettre, pas le reparer.
+ */
+export default function DemandeWizard({ edition = false }: { edition?: boolean }) {
   const { id } = useParams();
   const nav = useNavigate();
   const [step, setStep] = useState(0);
+  // En edition, l'id de route designe le dossier ; le membre vient de lui.
+  const [membreId, setMembreId] = useState<number | null>(edition ? null : Number(id));
+  const [chargement, setChargement] = useState(edition);
+  const [statutDossier, setStatutDossier] = useState("");
   const [produits, setProduits] = useState<Produit[]>([]);
   const [ref, setRef] = useState<Record<string, string[]>>({});
   const [membre, setMembre] = useState<MembreDetail | null>(null);
@@ -80,15 +96,41 @@ export default function DemandeWizard() {
   const [draft, setDraft] = useState<PieceDraft>(emptyDraft());
 
   useEffect(() => {
-    if (id) api.membre(Number(id)).then(setMembre).catch(() => undefined);
-  }, [id]);
+    if (!id) return;
+    if (!edition) {
+      setMembreId(Number(id));
+      api.membre(Number(id)).then(setMembre).catch(() => undefined);
+      return;
+    }
+    // Reprise : on repeuple le formulaire avec ce qui est deja en base, sinon
+    // une correction ecraserait les donnees valides par des champs vides.
+    setChargement(true);
+    Promise.all([api.demande(Number(id)), api.collecteComplete(Number(id))])
+      .then(([dem, col]) => {
+        setMembreId(dem.membre_id);
+        setStatutDossier(dem.statut);
+        setForm((f) => ({
+          ...f,
+          ...col.complete,
+          objet: dem.objet || "",
+          montant_demande: dem.montant_demande || 0,
+          duree_mois: dem.duree_mois || 12,
+          produit_id: dem.produit_id || f.produit_id,
+          situation_fiscale: dem.situation_fiscale || f.situation_fiscale,
+        }));
+        return api.membre(dem.membre_id).then(setMembre);
+      })
+      .catch((e) => setErr(e instanceof Error ? e.message : "Dossier introuvable"))
+      .finally(() => setChargement(false));
+  }, [id, edition]);
 
   useEffect(() => {
     api
       .produits()
       .then((ps) => {
-        setProduits(ps);
-        setForm((f) => (ps.length && !f.produit_id ? { ...f, produit_id: ps[0].id } : f));
+        const commercialisables = ps.filter((p) => !p.exceptionnel);
+        setProduits(commercialisables);
+        setForm((f) => (commercialisables.length && !f.produit_id ? { ...f, produit_id: commercialisables[0].id } : f));
       })
       .catch(() => undefined);
     // Selects de preuves / type de pièce / qualité photo : source unique = /referentiels,
@@ -151,7 +193,7 @@ export default function DemandeWizard() {
 
   async function createWithPieces() {
     const created = await api.createDemande({
-      membre_id: Number(id),
+      membre_id: Number(membreId),
       objet: form.objet,
       montant_demande: form.montant_demande,
       duree_mois: form.duree_mois,
@@ -168,21 +210,44 @@ export default function DemandeWizard() {
     return created;
   }
 
+  /** Enregistre la correction d'un dossier existant puis relance l'analyse.
+   * Les pieces deja deposees restent en place ; on n'ajoute que les nouvelles. */
+  async function saveEdition() {
+    const did = Number(id);
+    await api.modifierDemande(did, {
+      objet: form.objet,
+      montant_demande: form.montant_demande,
+      duree_mois: form.duree_mois,
+      produit_id: form.produit_id,
+      situation_fiscale: form.situation_fiscale,
+      credits_ailleurs: form.credits_ailleurs,
+      preuves_externes_ok: form.preuves_externes_ok,
+      collecte: collecte(),
+    });
+    for (const p of pieces) {
+      if (!p.file) continue;
+      await api.uploadPiece(did, { type_piece: p.type_piece, qualite_ocr: "ok", file: p.file });
+    }
+    return did;
+  }
+
   async function submit() {
     setErr("");
     if (!demandeOk) {
       setErr("Objet, montant demandé et CA sont obligatoires (étapes 1 et 3).");
       return;
     }
-    if (!piecesOk) {
+    // En correction, les pieces du dossier sont deja au dossier : en exiger une
+    // nouvelle a chaque passage obligerait a rephotographier pour changer un chiffre.
+    if (!edition && !piecesOk) {
       setErr("Ajoute au moins une pièce avec une photo.");
       return;
     }
     setBusy(true);
     try {
-      const created = await createWithPieces();
-      await api.analyser(created.id);
-      nav(`/demandes/${created.id}`);
+      const did = edition ? await saveEdition() : (await createWithPieces()).id;
+      await api.analyser(did);
+      nav(`/demandes/${did}`);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Erreur");
     } finally {
@@ -209,6 +274,57 @@ export default function DemandeWizard() {
     }
   }
 
+  if (chargement) {
+    return (
+      <div className="page">
+        <Spinner />
+      </div>
+    );
+  }
+
+  // Un compte gele ou radie ne peut pas ouvrir de demande : l'API le refuse
+  // (NON_MEMBRE / COMPTE_INACTIF). Sans ce controle en amont, l'agent saisit
+  // tout le formulaire et ne decouvre le refus qu'a l'enregistrement.
+  if (!edition && membre && membre.statut !== "actif") {
+    return (
+      <div className="page">
+        <h1>Demande impossible</h1>
+        <Alert kind="error">
+          Le compte de {membre.prenom} {membre.nom} est {membre.statut === "gele" ? "gelé" : "radié"} :{" "}
+          aucune demande de crédit n'est possible tant qu'il n'est pas réactivé.
+        </Alert>
+        <div className="actions">
+          <button className="btn ghost" type="button" onClick={() => nav(-1)}>
+            Revenir
+          </button>
+          <Link className="btn" to={`/membres/${membre.id}`}>
+            Voir la fiche
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Miroir de STATUTS_MODIFIABLES cote API. Sans ce controle en amont, on
+  // pouvait ouvrir l'ecran sur un dossier deja soumis, tout ressaisir, et ne
+  // decouvrir le refus (409) qu'au moment d'enregistrer.
+  if (edition && statutDossier && !MODIFIABLES.includes(statutDossier)) {
+    return (
+      <div className="page">
+        <h1>Dossier non modifiable</h1>
+        <Alert kind="error">
+          Ce dossier est au statut « {statutDossier} » : il est engagé dans le circuit de décision et
+          ne peut plus être corrigé.
+        </Alert>
+        <div className="actions">
+          <button className="btn ghost" type="button" onClick={() => nav(`/demandes/${id}`)}>
+            Revenir au dossier
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="page">
       <div className="wizard-top">
@@ -218,9 +334,12 @@ export default function DemandeWizard() {
           </svg>
         </button>
         <div className="wizard-title">
-          <span className="wizard-eyebrow">Étape {step + 1} — Collecte A–E</span>
+          <span className="wizard-eyebrow">
+            {edition ? `Correction du dossier #${id}` : "Étape " + (step + 1) + " — Collecte A–E"}
+          </span>
           <h1>
-            Demande de crédit{membre ? ` — ${membre.prenom} ${membre.nom}` : ""}
+            {edition ? "Corriger la demande" : "Demande de crédit"}
+            {membre ? ` — ${membre.prenom} ${membre.nom}` : ""}
           </h1>
         </div>
         <span className="wizard-count">{step + 1}/{STEPS.length}</span>
@@ -282,9 +401,9 @@ export default function DemandeWizard() {
               <label className="field">
                 Type d’activité
                 <select value={form.type_activite} onChange={(e) => patch("type_activite", e.target.value)}>
-                  <option value="commerce">Commerce</option>
-                  <option value="agriculture">Agriculture</option>
-                  <option value="services">Services</option>
+                  <option value="primaire">Primaire</option>
+                  <option value="secondaire">Secondaire</option>
+                  <option value="tertiaire">Tertiaire</option>
                 </select>
               </label>
               <label className="check">
@@ -483,9 +602,13 @@ export default function DemandeWizard() {
                   Retour
                 </button>
               )}
-              <button className="btn ghost" type="button" disabled={busy || !draftOk} onClick={saveDraft}>
-                Enreg. brouillon
-              </button>
+              {/* Le brouillon cree un nouveau dossier : hors de propos quand on
+                  en corrige un qui existe deja. */}
+              {!edition && (
+                <button className="btn ghost" type="button" disabled={busy || !draftOk} onClick={saveDraft}>
+                  Enreg. brouillon
+                </button>
+              )}
             </div>
             {step < STEPS.length - 1 && (
               <button className="btn primary" type="button" onClick={() => setStep(step + 1)}>
@@ -493,8 +616,13 @@ export default function DemandeWizard() {
               </button>
             )}
             {step === STEPS.length - 1 && (
-              <button className="btn primary" type="button" disabled={busy || !piecesOk || !demandeOk} onClick={submit}>
-                Enregistrer et analyser
+              <button
+                className="btn primary"
+                type="button"
+                disabled={busy || (!edition && !piecesOk) || !demandeOk}
+                onClick={submit}
+              >
+                {edition ? "Enregistrer et relancer l’analyse" : "Enregistrer et analyser"}
               </button>
             )}
           </div>

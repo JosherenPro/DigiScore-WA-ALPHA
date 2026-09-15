@@ -156,6 +156,7 @@ def vision_portefeuille(
                 "signal": f"Retard {retard} j - niveau N{detail.get('niveau')}",
                 "membre_id": member.id,
                 "member_code": member.external_code,
+                "member_name": svc.nom_complet(member),
                 "days_late": retard,
                 "niveau": detail.get("niveau"),
                 "priorite": svc.priorite(float(loan.outstanding or 0), retard),
@@ -349,6 +350,7 @@ def vision_dossiers(
             "case_id": case.id,
             "member_id": member.id,
             "member_code": member.external_code,
+            "member_name": svc.nom_complet(member),
             "niveau": case.level,
             "libelle": detail.get("libelle", ""),
             "action": case.action or detail.get("actions", ""),
@@ -372,6 +374,45 @@ def vision_dossiers(
         "page_size": page_size,
         "total": total,
         "items": page_items,
+    }
+
+
+@router.get(
+    "/vision/recouvrement/{case_id}/actions",
+    tags=["vision"],
+    response_model=ActionRecouvrementOut,
+)
+def get_actions_recouvrement(case_id: int, _user: StaffUser, db: Session = Depends(get_db)):
+    """Journal d'un dossier de recouvrement.
+
+    Il n'existait aucune lecture : le journal n'etait renvoye qu'en reponse a
+    une nouvelle action. Un agent qui appelle un membre ne pouvait donc pas
+    voir ce qui avait deja ete tente avant de le relancer.
+    """
+    case = db.get(RecoveryCase, case_id)
+    if not case:
+        raise HTTPException(404, "Dossier de recouvrement introuvable")
+    journal = [
+        {
+            "date": action.action_on.isoformat() if action.action_on else None,
+            "type": action.action_type,
+            "note": action.note,
+            "montant": float(action.amount_recovered or 0),
+        }
+        for action in db.scalars(
+            select(RecoveryAction)
+            .where(RecoveryAction.case_id == case.id)
+            .order_by(RecoveryAction.action_on)
+        ).all()
+    ]
+    return {
+        "case_id": case.id,
+        "level": case.level,
+        "priority": case.priority,
+        "status": case.status,
+        "next_on": case.next_on.isoformat() if case.next_on else None,
+        "recovered_amount": float(case.recovered_amount or 0),
+        "journal": journal,
     }
 
 

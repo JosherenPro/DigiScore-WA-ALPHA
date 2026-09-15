@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { money, type Critere } from "../api/client";
+import InfoTip from "./InfoTip";
 
 /* Composants graphiques du dashboard résultat/ML.
  * Palette : réutilise les tokens de marque (--green/--danger/--warning) —
@@ -37,6 +38,82 @@ export const CRITERE_LABELS: Record<string, string> = {
   activite: "Risque d'activité",
   garanties: "Garanties",
   documents: "Qualité documentaire",
+};
+
+/** Barème des 6 critères — copie fidèle de `scoring/digiscore/scorecard.py`
+ * (POIDS + note_*). À maintenir avec lui : une infobulle qui décrit un barème
+ * périmé induit en erreur celui qui signe. Toutes les notes sont bornées 0–100.
+ */
+export const CRITERE_BAREME: Record<
+  string,
+  { poids: string; mesure: string; regles: string[]; note?: string }
+> = {
+  financier: {
+    poids: "25 %",
+    mesure: "Santé structurelle de l’activité.",
+    regles: [
+      "Base 50",
+      "Solvabilité ≥ 1 : +15, sinon −20",
+      "Fonds de roulement ≥ 150 % : +15, sinon −10",
+      "Apport ≥ 35 % : +10",
+      "Marge brute ≥ 30 % : +10",
+      "−8 par ratio dégradé",
+    ],
+  },
+  capacite: {
+    poids: "20 %",
+    mesure: "Peut-il rembourser ?",
+    regles: [
+      "RCSD < 1 → 15 · < 1,5 → 45 · < 2 → 72 · ≥ 2 → 88",
+      "Un mois de trésorerie négative : −18",
+      "2 signaux ou plus : −12",
+    ],
+    note: "C’est l’axe qui porte le knock-out KNOCKOUT_RCSD.",
+  },
+  historique: {
+    poids: "20 %",
+    mesure: "Comportement de remboursement passé.",
+    regles: [
+      "Base 40",
+      "+12 par crédit soldé (maximum +30)",
+      "Un crédit soldé sans aucun retard : +10",
+      "Impayé au passif : −35",
+      "−20 par incident grave",
+      "Ancienneté ≥ 36 mois : +10 · < 3 mois : −15",
+      "Épargne moyenne 6 mois ≥ 300 000 F : +10",
+      "Crédits ailleurs avec preuves : +8",
+    ],
+  },
+  activite: {
+    poids: "15 %",
+    mesure: "Risque propre au métier exercé.",
+    regles: [
+      "Base 65",
+      "Activité saisonnière : −10",
+      "Dépendance à un seul débouché : −12",
+      "Érosion du chiffre d’affaires : −10",
+    ],
+    note: "Axe volontairement prudent : il ne dépasse jamais 65.",
+  },
+  garanties: {
+    poids: "10 %",
+    mesure: "Couverture du montant demandé.",
+    regles: [
+      "30 + 50 × taux de couverture (bonus plafonné, donc 80 au plus)",
+      "Cautions suffisantes quand elles sont exigées : +15",
+      "Cautions exigées mais insuffisantes : −25",
+    ],
+  },
+  documents: {
+    poids: "10 %",
+    mesure: "Qualité des preuves fournies.",
+    regles: [
+      "Base 40",
+      "Par preuve de revenu et de charge : N3 +20 · N2 +12 · N1 +4",
+      "Situation fiscale en règle : +12 · non conforme : −25",
+      "Crédits ailleurs sans preuves : −30",
+    ],
+  },
 };
 
 // Vecteur scorecard-v3 (scoring/digiscore/adaptive/scorecard_ml.py::FEATURE_NAMES_V3) —
@@ -78,6 +155,19 @@ function arcPath(cx: number, cy: number, r: number, t0: number, t1: number) {
   return `M${p0.x},${p0.y} A${r},${r} 0 ${large} 1 ${p1.x},${p1.y}`;
 }
 
+/** Libellés métier des plages de score (miroir de `policy.py` : 40 / 70). */
+export const ZONE_SCORE_LABEL: Record<string, string> = {
+  rejet: "Dossier à régulariser",
+  analyse: "Autorisation hiérarchique",
+  approbation: "Approbation suggérée",
+};
+
+const PLAGES_SCORE = [
+  { borne: "0–40", label: "Dossier à régulariser", tone: "low" },
+  { borne: "41–70", label: "Autorisation hiérarchique", tone: "mid" },
+  { borne: "71–100", label: "Approbation suggérée", tone: "high" },
+];
+
 export function ScoreGauge({ score, zone }: { score: number; zone?: string | null }) {
   const cx = 110;
   const cy = 100;
@@ -87,7 +177,9 @@ export function ScoreGauge({ score, zone }: { score: number; zone?: string | nul
   const eps = 0.012;
   const t = Math.max(0, Math.min(1, score / 100));
   const marker = polar(cx, cy, r, t);
+  const plageActive = score <= 40 ? 0 : score <= 70 ? 1 : 2;
   return (
+    <div className="gauge-block">
     <svg viewBox="0 0 220 120" className="gauge-svg" role="img" aria-label={`Score ${Math.round(score)} sur 100`}>
       {[0, 1, 2].map((i) => (
         <path
@@ -105,8 +197,22 @@ export function ScoreGauge({ score, zone }: { score: number; zone?: string | nul
       })}
       <circle cx={marker.x} cy={marker.y} r={7} className="gauge-marker" />
       <text x={cx} y={cy - 4} textAnchor="middle" className="gauge-value">{Math.round(score)}</text>
-      <text x={cx} y={cy + 16} textAnchor="middle" className="gauge-sub">/100{zone ? ` · ${zone}` : ""}</text>
+      <text x={cx} y={cy + 16} textAnchor="middle" className="gauge-sub">
+        /100{zone ? ` · ${ZONE_SCORE_LABEL[zone] || zone}` : ""}
+      </text>
     </svg>
+    <div className="gauge-legend">
+      {PLAGES_SCORE.map((p, i) => (
+        <span
+          key={p.tone}
+          className={`gauge-legend-item ${p.tone}${i === plageActive ? " active" : ""}`}
+          title={`Plage de score ${p.borne} : ${p.label}`}
+        >
+          <strong>{p.borne}</strong> {p.label}
+        </span>
+      ))}
+    </div>
+    </div>
   );
 }
 
@@ -122,7 +228,26 @@ export function CriteriaBars({ criteres }: { criteres: Critere[] }) {
         const contribution = c.contribution != null ? Math.round(Number(c.contribution)) : null;
         return (
           <div className="crit-row" key={code || i}>
-            <span className="crit-label">{CRITERE_LABELS[code] || code}</span>
+            <span className="crit-label">
+              {CRITERE_LABELS[code] || code}
+              {CRITERE_BAREME[code] && (
+                <InfoTip
+                  label={CRITERE_LABELS[code] || code}
+                  titre={`${CRITERE_LABELS[code] || code} — poids ${CRITERE_BAREME[code].poids}`}
+                >
+                  <span className="infotip-mesure">{CRITERE_BAREME[code].mesure}</span>
+                  <ul>
+                    {CRITERE_BAREME[code].regles.map((r) => (
+                      <li key={r}>{r}</li>
+                    ))}
+                  </ul>
+                  {CRITERE_BAREME[code].note && (
+                    <span className="infotip-note">{CRITERE_BAREME[code].note}</span>
+                  )}
+                  <span className="infotip-note">Note bornée entre 0 et 100, puis pondérée.</span>
+                </InfoTip>
+              )}
+            </span>
             <div className="crit-track">
               <div className="crit-fill" style={{ width: `${note}%` }} />
             </div>

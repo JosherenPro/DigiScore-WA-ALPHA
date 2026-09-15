@@ -1,9 +1,22 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, money, type CompteExterne, type HistoriqueMembre, type MembreDetail, type Mouvement } from "../api/client";
+import {
+  api,
+  money,
+  type BicOut,
+  type CompteExterne,
+  type DemandeResume,
+  type HistoriqueMembre,
+  type MembreDetail,
+  type Mouvement,
+  type PretEnCours,
+  type RecouvrementMembre,
+  type SuiviMembre,
+} from "../api/client";
 import Pager from "../components/Pager";
 import Spinner from "../components/Spinner";
 import Alert from "../components/Alert";
+import Section from "../components/Section";
 import { useApi } from "../hooks/useApi";
 
 type Fiche = {
@@ -12,6 +25,23 @@ type Fiche = {
   mv: { items: Mouvement[]; page: number; total: number };
   ext: CompteExterne[];
   extMv: { items: Mouvement[]; page: number; total: number };
+  bic: BicOut | null;
+  prets: PretEnCours[];
+  suivi: SuiviMembre[];
+  recouvrement: RecouvrementMembre[];
+  demandes: DemandeResume[];
+};
+
+// Les sous-ressources de la fiche (BIC, encours, suivi terrain, recouvrement)
+// sont accessoires : si l'une echoue, la fiche doit rester affichable.
+function optionnel<T>(p: Promise<T>, defaut: T): Promise<T> {
+  return p.catch(() => defaut);
+}
+
+const VISITE_LABEL: Record<string, string> = {
+  V1: "V1 — relance amiable",
+  V2: "V2 — visite terrain",
+  V3: "V3 — mise en demeure",
 };
 
 export default function Membre() {
@@ -21,16 +51,21 @@ export default function Membre() {
   const [extMv, setExtMv] = useState({ items: [] as Mouvement[], page: 1, total: 0 });
 
   const { data, error, loading } = useApi<Fiche>(async () => {
-    const [membre, hist, mv, ext, extMvRes] = await Promise.all([
+    const [membre, hist, mv, ext, extMvRes, bic, prets, suivi, recouvrement, demandes] = await Promise.all([
       api.membre(mid),
       api.historique(mid),
       api.mouvements(mid, 1),
       api.comptesExternes(mid),
       api.mouvementsExternes(mid, 1),
+      optionnel<BicOut | null>(api.membreBic(mid), null),
+      optionnel(api.membrePrets(mid), []),
+      optionnel(api.membreSuivi(mid), []),
+      optionnel(api.membreRecouvrement(mid), []),
+      optionnel(api.membreDemandes(mid, 1, 5).then((r) => r.items), []),
     ]);
     setMvPage(mv);
     setExtMv(extMvRes);
-    return { membre, hist, mv, ext, extMv: extMvRes };
+    return { membre, hist, mv, ext, extMv: extMvRes, bic, prets, suivi, recouvrement, demandes };
   }, [mid]);
 
   if (error) return <div className="page"><Alert kind="error">{error}</Alert></div>;
@@ -55,6 +90,17 @@ export default function Membre() {
       {m.thin_file && (
         <div className="banner-thin">Thin-file : historique interne léger. Le moteur le signalera à l’analyse.</div>
       )}
+      <div className="actions membre-cta">
+        {bloqué ? (
+          <p className="error">
+            Compte {m.statut !== "actif" ? m.statut : "inactif"} — aucune demande de crédit possible.
+          </p>
+        ) : (
+          <Link className="btn primary" to={`/membres/${m.id}/demande`}>
+            Souscrire un nouveau crédit
+          </Link>
+        )}
+      </div>
       <div className="grid two">
         <section className="block">
           <h2>Compte — cette COOPEC</h2>
@@ -87,8 +133,148 @@ export default function Membre() {
         </section>
       </div>
 
-      <section className="block mt-md">
-        <h2>Crédits passés</h2>
+      {(data.prets.length > 0 || data.bic?.rapport || data.bic?.consentement) && (
+        <div className="grid two mt-md">
+          {data.prets.length > 0 && (
+            <section className="block">
+              <h2>Encours en cours</h2>
+              <div className="list">
+                {data.prets.map((p, i) => (
+                  <div className="row" key={i}>
+                    <div>
+                      <strong>{money(p.encours)}</strong>
+                      <div className="muted">
+                        sur {money(p.principal)} · {p.statut}
+                        {p.echeance ? ` · échéance ${p.echeance}` : ""}
+                      </div>
+                    </div>
+                    <span className={`badge rect ${p.jours_retard > 30 ? "bad" : p.jours_retard > 0 ? "warn" : "ok"}`}>
+                      {p.jours_retard > 0 ? `${p.jours_retard} j de retard` : "à jour"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {(data.bic?.rapport || data.bic?.consentement) && (
+            <section className="block">
+              <h2>Centrale des risques (BIC)</h2>
+              <p className="ledger-note">
+                Consultation soumise au consentement écrit du membre — sans consentement signé, pas d’interrogation.
+              </p>
+              <div className="kv">
+                <span>Consentement</span>
+                {data.bic.consentement ? (
+                  <span className={`badge ${data.bic.consentement.statut === "signe" ? "ok" : "warn"}`}>
+                    {data.bic.consentement.statut}
+                    {data.bic.consentement.signe_le ? ` · ${data.bic.consentement.signe_le}` : ""}
+                  </span>
+                ) : (
+                  <span className="badge warn">absent</span>
+                )}
+                {data.bic.rapport && (
+                  <>
+                    <span>Crédits externes</span>
+                    <strong>{data.bic.rapport.nb_credits_externes}</strong>
+                    <span>Incidents BIC</span>
+                    <strong>{data.bic.rapport.nb_incidents}</strong>
+                    <span>Synthèse</span>
+                    <span>{data.bic.rapport.synthese || "—"}</span>
+                  </>
+                )}
+              </div>
+            </section>
+          )}
+        </div>
+      )}
+
+      {m.garanties?.length > 0 && (
+        <section className="block mt-md">
+          <h2>Garanties déclarées</h2>
+          <div className="list">
+            {m.garanties.map((g, i) => (
+              <div className="row" key={i}>
+                <strong>{g.nature}</strong>
+                <span>{money(g.valeur)}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {data.suivi.length > 0 && (
+        <Section titre="Suivi terrain" compteur={data.suivi.length}>
+          <div className="list">
+            {data.suivi.map((v, i) => (
+              <div className="row" key={i}>
+                <div>
+                  <strong>{VISITE_LABEL[v.visite] || v.visite}</strong>
+                  <div className="muted">
+                    {v.date || "date inconnue"}
+                    {v.signal ? ` · ${v.signal}` : ""}
+                  </div>
+                </div>
+                {v.jours_retard != null && v.jours_retard > 0 && (
+                  <span className="badge rect warn">{v.jours_retard} j</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {data.recouvrement.length > 0 && (
+        <Section titre="Recouvrement" compteur={data.recouvrement.length}>
+          {data.recouvrement.map((r, i) => (
+            <div key={i} className="mb-sm">
+              <div className="row">
+                <div>
+                  <strong>Niveau N{r.niveau} — {r.action || "action non précisée"}</strong>
+                  <div className="muted">
+                    {r.responsable ? `${r.responsable} · ` : ""}
+                    {r.ouvert_le ? `ouvert le ${r.ouvert_le}` : ""}
+                  </div>
+                </div>
+              </div>
+              {r.journal.length > 0 && (
+                <ul className="muted">
+                  {r.journal.map((j, k) => (
+                    <li key={k}>
+                      {j.date || "—"} · {j.type}
+                      {j.note ? ` — ${j.note}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </Section>
+      )}
+
+      {data.demandes.length > 0 && (
+        <Section titre="Demandes de ce membre" compteur={data.demandes.length}>
+          <div className="list">
+            {data.demandes.map((dem) => (
+              <div className="row" key={dem.id}>
+                <div>
+                  <Link to={`/demandes/${dem.id}`}>
+                    <strong>Dossier #{dem.id}</strong>
+                  </Link>
+                  <div className="muted">
+                    {money(dem.montant_demande)}
+                    {dem.score != null ? ` · score ${Math.round(dem.score)}/100` : ""}
+                    {dem.message_code ? ` · ${dem.message_code}` : ""}
+                  </div>
+                </div>
+                <span className="badge rect">{dem.statut}</span>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      <Section titre="Crédits passés" compteur={(hist?.credits_passes || m.credits_passes).length}>
         <table>
           <thead>
             <tr>
@@ -113,11 +299,9 @@ export default function Membre() {
             ))}
           </tbody>
         </table>
-        {(hist?.credits_passes || m.credits_passes).length === 0 && <p className="muted">Aucun crédit passé.</p>}
-      </section>
+      </Section>
 
-      <section className="block mt-md">
-        <h2>Mouvements agence</h2>
+      <Section titre="Mouvements agence" compteur={mvPage.total} resume="Livre de cette COOPEC">
         <p className="ledger-note">Livre de cette COOPEC seulement — pas mélangé avec un relevé ailleurs.</p>
         <table>
           <thead>
@@ -139,7 +323,6 @@ export default function Membre() {
             ))}
           </tbody>
         </table>
-        {mvPage.total === 0 && <p className="muted">Aucun mouvement agence.</p>}
         <Pager
           page={mvPage.page}
           pageSize={30}
@@ -148,11 +331,14 @@ export default function Membre() {
             api.mouvements(mid, p).then((r) => setMvPage({ items: r.items, page: r.page, total: r.total }))
           }
         />
-      </section>
+      </Section>
 
       {m.nb_comptes_externes > 0 && (
-        <section className="block mt-md">
-          <h2>Ailleurs — autre COOPEC / banque / IMF</h2>
+        <Section
+          titre="Ailleurs — autre COOPEC / banque / IMF"
+          compteur={ext.length}
+          resume="Preuve d’historique hors agence"
+        >
           <p className="ledger-note">Preuve d’historique hors agence. Pas Flooz / T-Money. Ne change pas le solde local.</p>
           {ext.map((c) => (
             <div className="kv mb-sm" key={c.id}>
@@ -194,18 +380,10 @@ export default function Membre() {
               api.mouvementsExternes(mid, p).then((r) => setExtMv({ items: r.items, page: r.page, total: r.total }))
             }
           />
-        </section>
+        </Section>
       )}
 
-      <div className="actions">
-        {bloqué ? (
-          <p className="error">Compte inactif / gelé — demande impossible (cas MEM-010).</p>
-        ) : (
-          <Link className="btn" to={`/membres/${m.id}/demande`}>
-            Nouvelle demande
-          </Link>
-        )}
-      </div>
+
     </div>
   );
 }

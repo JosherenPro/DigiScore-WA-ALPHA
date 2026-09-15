@@ -7,8 +7,8 @@ from app.main import app
 client = TestClient(app)
 
 
-def _login(login: str, password: str = "demo"):
-    return client.post("/auth/login", json={"login": login, "password": password})
+def _login(login: str, password: str | None = None):
+    return client.post("/auth/login", json={"login": login, "password": password or login})
 
 
 def _token(login: str) -> str:
@@ -25,12 +25,37 @@ def test_health_db():
     assert "database" in body
 
 
-def test_capabilities_stub():
+def test_capabilities_ml_desactive(monkeypatch):
+    """ML coupe : aucune capacite annoncee, meme si les artefacts sont sur le disque.
+
+    L'ancienne version de ce test lisait /capabilities sans fixer ML_ENABLED :
+    elle passait ou echouait selon la variable d'environnement du shell qui
+    lancait pytest, pas selon le code. On pilote desormais le drapeau.
+    """
+    monkeypatch.setenv("ML_ENABLED", "0")
     r = client.get("/capabilities")
     assert r.status_code == 200
     body = r.json()
-    assert body["anomalies"] is False
     assert body["ml_scorecard"] is False
+    assert body["anomalies"] is False
+    assert body["simulation"] is False
+    assert body["early_warning"] is False
+    assert body["model_version"] is None
+
+
+def test_capabilities_ml_active(monkeypatch):
+    """ML actif : simulation et early warning suivent le drapeau ; scorecard et
+    anomalies dependent en plus de la presence d'un artefact entraine."""
+    monkeypatch.setenv("ML_ENABLED", "1")
+    body = client.get("/capabilities").json()
+    assert body["simulation"] is True
+    assert body["early_warning"] is True
+    assert isinstance(body["ml_scorecard"], bool)
+    assert isinstance(body["anomalies"], bool)
+    # Toute capacite annoncee doit pouvoir nommer le modele qui la sert :
+    # un eclairage consultatif sans version affichable n'est pas auditable.
+    if body["ml_scorecard"] or body["anomalies"]:
+        assert body["model_version"]
 
 
 def test_login_ok_and_bad_password():
@@ -63,7 +88,7 @@ def test_agent_can_lookup_paginated():
 
 
 def test_decision_unknown_avis_400():
-    token = _token("chef")
+    token = _token("direct")
     # "nimp" n'existe pas dans l'enum AvisDecision -> 422 de validation Pydantic
     # (avant memes les alias toleres ; la BDD n'est jamais atteinte).
     r = client.post(
