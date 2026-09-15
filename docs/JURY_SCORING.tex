@@ -1,0 +1,415 @@
+% !TEX program = pdflatex
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{lmodern}
+\usepackage{geometry}
+\geometry{margin=2cm,headheight=14.5pt,includehead,includefoot}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{amsmath,amssymb}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{listings}
+\usepackage{microtype}
+\usepackage{tcolorbox}
+\usepackage{titlesec}
+\usepackage{xurl}
+\usepackage{graphicx}
+\usepackage{titling}
+
+\tcbuselibrary{breakable,skins}
+
+\hypersetup{colorlinks=true,linkcolor=blue!60!black,urlcolor=blue!60!black,citecolor=black}
+\definecolor{codebg}{gray}{0.96}
+\definecolor{bleujury}{RGB}{27,58,115}
+\definecolor{grisleg}{RGB}{90,90,90}
+
+\lstset{
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  breakatwhitespace=false,
+  postbreak=\mbox{\textcolor{grisleg}{$\hookrightarrow$}\space},
+  frame=single,
+  rulecolor=\color{gray!40},
+  columns=flexible,
+  keepspaces=true,
+  xleftmargin=4pt,
+  xrightmargin=4pt,
+  aboveskip=4pt,
+  belowskip=4pt
+}
+
+% Code inline qui coupe les longs noms techniques et gère les underscores
+\newcommand{\C}[1]{{\small\texttt{\nolinkurl{#1}}}}
+% Compat : rend \texttt tolerant aux coupures
+\sloppy
+\setlength{\emergencystretch}{3em}
+
+\titleformat{\section}{\large\bfseries\color{bleujury}}{ \thesection.}{0.6em}{}[\vspace{-0.4em}\rule{\linewidth}{0.8pt}]
+\titleformat{\subsection}{\normalsize\bfseries\color{bleujury!85!black}}{\thesubsection}{0.6em}{}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small\textcolor{bleujury}{\textbf{DigiScore-WA} -- Moteur de scoring}}
+\rhead{\small\textcolor{grisleg}{Préparation jury}}
+\cfoot{\small\textcolor{grisleg}{\thepage}}
+\renewcommand{\headrulewidth}{0.6pt}
+
+\newtcolorbox{encadrebleu}{colback=bleujury!6,colframe=bleujury!70!black,fonttitle=\bfseries,sharp corners,boxrule=0.8pt,left=6pt,right=6pt,top=6pt,bottom=6pt,breakable}
+\newtcolorbox{encadreorange}{colback=orange!8,colframe=orange!70!black,sharp corners,boxrule=0.8pt,left=6pt,right=6pt,top=6pt,bottom=6pt,breakable}
+\newtcolorbox{encadrevert}{colback=green!6,colframe=green!45!black,sharp corners,boxrule=0.8pt,left=6pt,right=6pt,top=6pt,bottom=6pt,breakable}
+
+\setlist[itemize]{leftmargin=*,itemsep=2pt,topsep=3pt}
+\setlist[enumerate]{leftmargin=*,itemsep=2pt,topsep=3pt}
+\setlist[description]{leftmargin=*,itemsep=3pt,topsep=3pt,font=\bfseries\color{bleujury}}
+
+\title{{\color{bleujury}DigiScore-WA : Moteur de scoring} \\[0.4em] \large Ce que le jury va attaquer --- explication du score, plafond, ML et lexique métier}
+\author{Équipe Alpha -- Hackathon CIF DigiCoop-WA+}
+\date{Septembre 2026}
+\setlength{\droptitle}{-3.2em}
+\setlength{\abovedisplayskip}{4pt}
+\setlength{\belowdisplayskip}{4pt}
+
+\begin{document}
+\maketitle
+
+\begin{encadrebleu}
+\centering \textbf{Modèle ML accepté pour la démo} (mode shadow consultatif). Dans la décision : \C{ML\_ENABLED=0}, \C{engine\_version=rules-v1}, \C{GET /capabilities} à \C{false} par défaut. \\[0.3em]
+Règle produit : \textbf{le ML éclaire, l'humain décide}.
+\end{encadrebleu}
+
+\vspace{0.4em}
+\begin{center}
+\begin{tabularx}{\linewidth}{lX}
+\toprule
+\textbf{Question jury} & \textbf{Réponse en 10 secondes} \\
+\midrule
+Le score, c'est quoi ? & Somme pondérée /100 de 6 notes métier, zones 0--40 / 41--70 / 71--100. \\
+Le plafond, c'est quoi ? & \C{min(plafond\_produit, capacite\_epargne\_CAF, capacite\_RCSD)}, décoté par zone, arrondi à 10\,000 FCFA. \\
+Le ML décide ? & Non. Shadow consultatif, jamais \C{eligible} / \C{zone} / KO. \\
+Qui décide ? & Agent $\rightarrow$ Chef $\rightarrow$ CIC, override motivé tracé. \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+{\small
+\tableofcontents
+}
+\newpage
+
+% ============================================================
+\section{Ce qui a été fait --- en 1 minute}
+
+Moteur \textbf{pur, déterministe, sans BDD ni réseau} :
+\begin{lstlisting}
+scoring/digiscore/pipeline.py :: run(DossierInput) -> ScoreResult
+\end{lstlisting}
+
+Chaîne réelle :
+\begin{lstlisting}
+Postgres -> dossier_builder -> run(dossier) -> ScoreResult -> Agent -> Chef -> CIC
+\end{lstlisting}
+
+\begin{itemize}
+  \item \textbf{Package \C{scoring/}} : règles auditables. Jamais de SQL, HTTP, ni lecture de modèle ML.
+  \item \textbf{Backend} : \C{backend/app/services/dossier_builder.py} assemble le dossier, persiste \C{score_result} + \C{financial_ratio}, historise avant ré-analyse (\C{score_result_history}).
+  \item \textbf{Décision} : jamais automatique. Circuit \textbf{Agent $\rightarrow$ Chef d'agence $\rightarrow$ CIC}, override motivé tracé (\C{decision}, \C{audit_log}).
+\end{itemize}
+
+\begin{encadrevert}
+\textbf{Comptes démo (mot de passe \texttt{demo}) :} \texttt{agent} (Ama Agent) pour analyser, \texttt{chef} (Koffi Chef) pour valider, \texttt{cic} (Comite CIC) pour la voie exceptionnelle. \texttt{POST /auth/login} puis header \texttt{Authorization: Bearer <token>}.
+\end{encadrevert}
+
+% ============================================================
+\section{Comment le score est obtenu}
+
+\subsection{Entrée \texttt{DossierInput} --- 5 blocs (clés FR, contrat figé)}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{lX}
+\toprule
+Bloc & Contenu exploité \\
+\midrule
+\C{membre} & \C{anciennete_mois}, \C{statut} \\
+\C{compte} & \C{solde}, \C{statut} (gelé = KO) \\
+\C{historique} & crédits passés (statut, retards, jours max), incidents (gravité), épargne moy.\ 3m/6m, nb mouvements 90j, crédits ailleurs + preuves externes, v3 : \C{ext_epargne_6m}, \C{bic_incidents} \\
+\C{demande} & montant, durée, \C{plafond_produit}, \C{seuil_caution}, \C{exceptionnel}, \C{situation_fiscale}, \C{exclusion_esg}, cautions éligibles/min \\
+\C{analyse} & CA, CMV, charges, produits financiers, revenu perso, charge familiale, charge crédits en cours, fonds propres, dettes, actif, stock, résultat net, valeur garanties, preuves N1--N3, saisonnier, dépendance débouché, concurrence, trésorerie 12 mois, patrimoine + 5 signaux \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\C{dossier_builder.py} fait le mapping schéma EN $\rightarrow$ clés FR. Le scoring ne fait jamais de SQL. Tout renommage de champ ou de \C{message_code} = coordination back + front.
+
+\subsection{Étage financier \texttt{financials.py}}
+
+\begin{align*}
+\text{EBE} &= \text{CA} - \text{CMV} - \text{charges\_exploitation} \\
+\text{CAF} &= \text{EBE} + \text{produits\_financiers} + (\text{revenu\_perso} - \text{charge\_familiale}) \\
+\text{Service\_annuel} &= (\text{montant} + \text{montant} \times 1{,}8\% \times \text{durée}/12) \times (12/\text{durée}) \\
+\text{RCSD} &= \frac{\text{CAF}}{\text{charge\_crédits\_en\_cours} + \text{service\_sollicité}}
+\end{align*}
+
+\begin{itemize}
+  \item Taux \textbf{1,8\,\%/an simple indicatif}, centralisé dans \C{policy.py} (\C{CREDIT_SERVICE_RATE}).
+  \item \textbf{RCSD $< 1{,}00$ = knockout}, \textbf{RCSD $\geq 1{,}50$ = confort} pour le plafond.
+  \item 6 ratios : marge brute \%, BN/CA \%, solvabilité = fonds\_propres/dettes ($>1$), rotation stocks (jours), participation = fonds\_propres/actif ($>35$\,\%), fonds de roulement = actif\_circulant/passif\_circulant ($>150$\,\%). \C{nb_ratios_degrades} compte les seuils ratés.
+  \item Trésorerie : cumul mois par mois, \C{mois_critique} = premier mois où cumul $<0$.
+  \item Patrimoine : situation nette = actifs prod + non prod $-$ passifs formels $-$ informels + \C{nb_signaux} 0--5.
+\end{itemize}
+
+\subsection{Score /100 \texttt{scorecard.py}}
+
+\begin{encadrebleu}
+\centering $\text{score} = \sum (\text{note}_i/100 \times \text{poids}_i \times 100)$ \\[0.3em]
+{\small\textbf{financier 25\,\% \enspace|\enspace capacité 20\,\% \enspace|\enspace historique 20\,\% \enspace|\enspace activité 15\,\%} \\[0.2em]
+\textbf{garanties 10\,\% \enspace|\enspace documents 10\,\%}}
+\end{encadrebleu}
+
+\begin{encadrevert}
+\textbf{Réponse en un paragraphe --- \og Comment est calculé le score ? \fg{} :} Le score est calculé comme une somme pondérée sur 100~: chaque dossier reçoit six notes bornées 0--100 --- financier 25\,\%, capacité 20\,\%, historique 20\,\%, activité 15\,\%, garanties 10\,\%, documents 10\,\% --- et le score global vaut la somme des contributions (\texttt{note/100} $\times$ \texttt{poids} $\times$ 100), ce qui rend chaque point traçable dans \texttt{criteres[]}~; concrètement on calcule au niveau financier la solidité bilancielle (solvabilité, fonds de roulement, participation, marge et nombre de ratios dégradés), au niveau capacité la soutenabilité de l'échéance (paliers de RCSD issu de CAF/service de la dette, avec malus si creux de trésorerie ou signaux patrimoniaux), au niveau historique la discipline passée (crédits soldés avec ou sans retard, impayés, incidents graves, ancienneté et régularité d'épargne), au niveau activité le risque métier (saisonnalité, dépendance à un débouché, érosion du CA), au niveau garanties la couverture réelle (valeur des garanties rapportée au montant plus bonus/malus cautionnaires au-delà du seuil) et au niveau documents la fiabilité du dossier (niveaux de preuve N1/N2/N3, conformité fiscale et preuves externes exigibles), puis on projette ce total dans trois zones métier --- 0--40 rejet recommandé, 41--70 analyse/CIC, 71--100 approbation recommandée --- sachant que les knock-outs restent prioritaires sur le score et que ni le plafond ni le ML ne modifient jamais cette note, ce qui garantit une décision par règles, explicable et rejouable.
+\end{encadrevert}
+
+Logique des notes (/100, bornées 0--100) :
+\begin{itemize}
+  \item \textbf{financier} : base 50 + bonus solvabilité $\geq 1$, FR $\geq 150$\,\%, participation $\geq 35$\,\%, marge $\geq 30$\,\% $-$ 8 $\times$ ratio dégradé.
+  \item \textbf{capacité} : paliers RCSD $<1 : 15$, $<1{,}5 : 45$, $<2 : 72$, sinon 88 ; $-18$ si creux tréso, $-12$ si $\geq 2$ signaux.
+  \item \textbf{historique} : base 40 + 12/crédit soldé (max 30) + 10 si un soldé sans retard $-$ 35 si impayé $-$ 20/grave + 10 si ancienneté $\geq 36$ mois $-$ 15 si $<3$ mois + 10 si épargne 6m $\geq 300\,000$ FCFA.
+  \item \textbf{activité} : 65 $-$ 10 saisonnier $-$ 12 dépendance débouché $-$ 10 érosion CA.
+  \item \textbf{garanties} : $30+\min(50, \text{couverture}\times 50)$ + 15 si cautions OK au-delà du seuil, $-$ 25 sinon.
+  \item \textbf{documents} : 40 + N3:20 / N2:12 / N1:4 par preuve + 12 fiscal en règle $-$ 25 non conforme $-$ 30 crédits ailleurs sans preuves.
+\end{itemize}
+
+Zones (\texttt{policy.py}) : \textbf{0--40 rejet \enspace|\enspace 41--70 analyse/CIC \enspace|\enspace 71--100 approbation}. Sortie \texttt{criteres[]} (code, note, poids, contribution) = explicabilité affichée à l'agent.
+
+\subsection{Knock-outs \texttt{pipeline.py + policy.py} --- prioritaires sur le score}
+
+Ordre \C{MESSAGE_PRIORITY} :
+\begin{lstlisting}
+COMPTE_INACTIF > PREUVES_EXTERNES_MANQUANTES > CAUTION_REQUISE
+> KNOCKOUT_RCSD > KNOCKOUT_ESG > BIC_OU_FISCAL_MANQUANT > INCIDENTS_RECENTS
+\end{lstlisting}
+
+Déclencheurs : membre/compte non actif, \C{exclusion_esg}, crédits ailleurs sans preuves, fiscal \C{non_conforme} ou montant $\geq 500\,000$ + \C{non_fourni}, cautions insuffisantes si montant $\geq$ \C{seuil_caution}, RCSD $<1$, incident grave.
+
+\begin{encadreorange}
+\textbf{Effet KO :} \C{zone=rejet}, \C{eligible=false}, \C{montant_eligible=0}, \C{suggestion=None}. Tous conservés dans \C{knockouts[]} pour audit, un seul \C{message_code} affiché via \C{select_knockout_message()}.
+\end{encadreorange}
+
+\subsection{Plafond \texttt{limits.py}}
+
+\begin{lstlisting}
+cap_epargne_CAF = (epargne6m*4 si thin sinon *8 + CAF*0.6) * bonus_histo
+# bonus = 1.15 si solde sans retard, 0.35 si impaye, sinon 1.0
+cap_RCSD = montant_pour_service(CAF/1.5 - dettes_existantes)
+raw = min(plafond_produit, cap_epargne_CAF, cap_RCSD)
+thin : raw = min(raw, max(50k, epargne6m*3), 250k)
+score<=40 : *0.4 ;  41-70 : *0.75
+eligible = floor(raw/10k)*10k
+suggestion si score>=80, non-thin, eligible > demande*1.15
+VOIE_EXCEPTIONNELLE si montant>=8M ou produit exceptionnel -> humain/CIC
+\end{lstlisting}
+
+Codes métier :
+\begin{lstlisting}
+MONTANT_OK, MONTANT_PLAFONNE, UPSELL_POSSIBLE,
+HISTORIQUE_INSUFFISANT, VOIE_EXCEPTIONNELLE, REJET_SCORE + 9 codes KO
+\end{lstlisting}
+
+\begin{encadrevert}
+\textbf{Thin-file} = ancienneté $<3$ mois \textbf{OU} (0 crédit soldé \textbf{ET} épargne 6m $<80$k \textbf{ET} mvt 90j $<3$). Micro-plafond, pas refus automatique.
+\end{encadrevert}
+
+Cas démo : MEM-001 \texttt{MONTANT\_OK} / \texttt{UPSELL}, MEM-004 thin + RCSD insuffisant \texttt{KNOCKOUT\_RCSD}, MEM-009 10M \texttt{VOIE\_EXCEPTIONNELLE} $\rightarrow$ CIC, MEM-010 gelé = pas de demande.
+
+Sortie \texttt{ScoreResult} :
+\begin{lstlisting}
+eligible, thin_file, score_global, criteres[], knockouts[],
+montant_demande, montant_eligible, montant_max_suggestion,
+message_code, message_humain, explication[], zone, financials
+\end{lstlisting}
+
+% ============================================================
+\clearpage
+\section{Modèles ML du projet --- ce qu'ils font}
+
+\begin{encadrevert}
+\textbf{Statut démo :} les modèles ci-dessous sont \textbf{acceptés pour la démonstration jury} en mode shadow (\texttt{ML\_ENABLED=1} possible) : ils éclairent le dossier (proba indicative, anomalies, simulations, plafond consultatif) sans jamais écrire \texttt{eligible}, \texttt{zone}, \texttt{message\_code} ni les knockouts. En production, seuls des historiques FUCEC réels valideront le risque.
+\end{encadrevert}
+
+\subsection{Catalogue des modèles entraînés}
+
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{2.5cm}>{\raggedright\arraybackslash}p{4.3cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{3.4cm}}
+\toprule
+\textbf{Modèle} & \textbf{Algo + données} & \textbf{Sortie} & \textbf{Métriques / réserve} \\
+\midrule
+\texttt{scorecard-v1} & LogReg + StandardScaler, 11 vars ; 20\,000 synthétiques & Proba de défaut + score /100 + contributions logit & AUC 0,711 ; Brier 0,215 ; déprécié (\texttt{class\_weight} = \texttt{balanced} décotait 71\,\%) \\
+\texttt{scorecard-v2} & Idem mais non pondérée ; 20\,000 synthétiques & Proba de défaut calibrée & AUC 0,711 ; Brier 0,145 ; fallback si v3 absent \\
+\texttt{scorecard-v3} & LogReg 20 vars (11 v2 + 9 v3) ; 20\,011 demandes Postgres point-in-time, label \texttt{par30\_futur} (2,45\,\%) & \texttt{probabilite\_defaut}, \texttt{niveau\_risque}, \texttt{top\_factors} en shadow & AUC 1,0 / Brier 4,6e-05 : fuite du label assumée, shadow/démo uniquement \\
+\texttt{anomaly-v1} & IsolationForest 6 vars ; 5\,000 dossiers « normaux » & Score d'incohérence 0--1 + top 3 features (z-score) & Remplacé : \texttt{revenus\_sur\_epargne} explosait sur thin-file (MEM-004 score 1,0) \\
+\texttt{anomaly-v2} & IsolationForest 6 vars, feature revenus passée en \texttt{log1p} ; 5\,000 & Idem corrigé & Fallback si v3 absent \\
+\texttt{anomaly-v3} & IsolationForest 10 vars ; 8\,000 dossiers sains du dataset v3 & Idem + externes/BIC/impayés/preuves & Actif shadow ; thin \texttt{scope\_excluded} \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{Composants sans entraînement (déterministes)}
+
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{3.6cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{4.2cm}}
+\toprule
+\textbf{Composant} & \textbf{Mécanique} & \textbf{Sortie} \\
+\midrule
+\texttt{resilience-v2} & Monte Carlo déterministe : 1\,000 trajectoires, \texttt{seed=72}, bruits encaissements $\pm$12\,\% et décaissements $\pm$8\,\% tirés indépendamment ; scénarios choc / maladie / inflation & \texttt{p\_incident}, trajectoires P10/P50/P90, \texttt{mois\_critique} \\
+\texttt{credit-limit-}\hspace{0pt}\texttt{advisory-v1} & Décote du plafond règles selon la grille de risque 10/20/35\,\% ; arrondi bas 10\,000 FCFA ; jamais au-dessus des règles & \texttt{plafond\_ml\_recommande}, \texttt{facteur\_prudence}, \texttt{detail} + \texttt{raisons} en FCFA ; nul si KO \\
+\texttt{early-warning-v1} & Règles SQL sur \texttt{outstanding\_loan.days\_late} + signaux \texttt{portfolio\_followup} & File d'alertes portefeuille pour chef/CIC \\
+Contrefactuels & Recherche du premier seuil \texttt{target=71} sur 4 leviers (épargne, garanties, durée, ancienneté) & Levier, \texttt{variation\_min}, nouveau score/plafond ; bloqué si KO \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{Ce que chaque modèle fait, en clair}
+
+\begin{itemize}
+  \item \textbf{Scorecard --- « ce dossier ressemble-t-il à un défaut futur ? »} : estime une probabilité indicative à partir de 20 variables (6 notes métier, RCSD, ancienneté, régularité d'épargne, incidents, montant/plafond, externes, BIC, impayés, retards max, preuves, débouché, concurrence, signaux patrimoine) et l'explique par contributions logit triées. Ne lève jamais un knockout, n'écrit jamais \texttt{eligible} / \texttt{zone} / \texttt{message\_code}.
+  \item \textbf{Anomalies --- « ce dossier est-il incohérent par rapport aux dossiers sains ? »} : IsolationForest entraîné sur 8\,000 dossiers sains, restitue un score 0--1 et les 3 écarts les plus forts ; signal \texttt{a\_verifier} pour l'agent, jamais un refus ; thin-files explicitement hors scope.
+  \item \textbf{Résilience --- « si choc, la trésorerie tient-elle ? »} : simule le solde cumulé sous choc (mauvaise récolte, maladie, inflation) et donne la fréquence d'incident et le mois critique. \texttt{p\_incident} est une fréquence de simulation reproductible, pas une probabilité de défaut.
+  \item \textbf{Plafond ML --- « combien prêter en décotant selon le risque ? »} : réduit le plafond règles d'un facteur prudent (1,0 / 0,9 / 0,75 / 0,6) et détaille chaque étape en FCFA ; reste toujours $\leq$ plafond règles et vaut nul si knockout.
+  \item \textbf{Early warning --- « quels crédits revoir en priorité ? »} : liste les encours à risque pour chef/CIC (agent en 403), sans changer le statut d'un crédit.
+  \item \textbf{Contrefactuels --- « quel effort minimal ferait passer le dossier ? »} : cherche la plus petite variation d'épargne, garanties, durée ou ancienneté pour atteindre 71, sans jamais contourner un knockout.
+\end{itemize}
+
+\subsection{Routes et réentraînement}
+
+\begin{lstlisting}
+GET  /capabilities                     etat des modeles (false par defaut, ML_ENABLED=0)
+GET  /demandes/{id}/ml/scorecard       shadow : proba, niveau de risque, top_factors
+GET  /demandes/{id}/ml/plafond         plafond ML indicatif (null si KO)
+GET  /demandes/{id}/anomalies          incoherences a verifier
+POST /demandes/{id}/simuler            Monte Carlo (scenario, iterations, seed)
+POST /demandes/{id}/simulation/enregistrer   snapshot relisible (seed + version)
+GET  /portefeuille/alertes             chef/CIC uniquement (403 agent)
+\end{lstlisting}
+
+Toutes derrière \texttt{ML\_ENABLED=1} et \texttt{require\_ml} (503 sinon) ; aucune n'écrit \texttt{score\_result} ni \texttt{decision}.
+
+\begin{lstlisting}
+# Reentrainement v3 (Postgres point-in-time)
+python training/build_dataset_v3.py && python training/train_v3.py
+# Reentrainement v2 (synthetique)
+python training/generate.py && python training/train_scorecard.py && python training/train_anomaly.py
+\end{lstlisting}
+
+\subsection{Garanties et réserves}
+
+\begin{encadrebleu}
+\textbf{Le ML éclaire, l'humain décide :} scorecard, anomalies, plafond ML et simulations n'influencent jamais \texttt{eligible}, \texttt{montant\_eligible}, \texttt{zone}, \texttt{message\_code}, les knockouts ni le routage Agent $\rightarrow$ Chef $\rightarrow$ CIC. Le score règles et les poids métier restent affichés en parallèle.
+\end{encadrebleu}
+
+\begin{encadreorange}
+\textbf{Réserves à assumer devant le jury :} label v3 sans filtre date \texttt{applied\_at} $\rightarrow$ fuite, AUC $\approx 1$ ; anomalies saturent à 1,0 ; artefacts sklearn 1.7 vs 1.9 ; seuils ML indicatifs à recalibrer sur vrais défauts FUCEC.
+\end{encadreorange}
+
+Données : 12 golden stables + $\sim$120k \texttt{VOL-} uniques (thin 7\,\%, frozen 5\,\%, late 8\,\%, seasonal 10\,\%, ancien 40\,\%), deux cahiers jamais fusionnés (agence vs ailleurs), dates \texttt{disbursed\_on} / \texttt{due\_on} / \texttt{as\_of} / \texttt{period\_month} pour PAR/snapshot point-in-time.
+
+% ============================================================
+\section{Lexique métier --- définitions courtes}
+
+\begin{description}
+  \item[EBE] Excédent brut d'exploitation : CA $-$ CMV $-$ charges d'exploitation. Richesse de l'activité avant financier et ménage.
+  \item[CAF] Capacité d'autofinancement : EBE + produits financiers + (revenu perso $-$ charge familiale). Ce qui reste pour rembourser.
+  \item[RCSD] Ratio de couverture du service de la dette : CAF / (dettes en cours + service sollicité). $<1$ = ne couvre pas l'échéance ; $\geq 1{,}5$ = confort.
+  \item[Solvabilité] fonds\_propres / dettes. $>1$ exigé : plus de fonds propres que de dettes.
+  \item[Fonds de roulement (\%)] actif\_circulant / passif\_circulant. $>150$\,\% exigé : coussin court terme.
+  \item[Participation (\%)] fonds\_propres / actif total. $>35$\,\% exigé : l'exploitant finance son affaire.
+  \item[Marge brute (\%)] (CA $-$ CMV)/CA. Rentabilité commerciale.
+  \item[BN/CA (\%)] résultat\_net / CA. Rentabilité finale.
+  \item[Rotation stocks (jours)] stock\_moyen $\times$ 365 / CMV. Vitesse d'écoulement.
+  \item[Situation nette] actifs productifs + non productifs $-$ passifs formels $-$ informels. Patrimoine net.
+  \item[Mois critique] Premier mois où la trésorerie cumulée devient négative.
+  \item[Thin-file] Dossier sans historique : $<3$ mois d'ancienneté ou 0 crédit soldé + petite épargne + peu de mouvements. Micro-plafond, pas refus auto.
+  \item[Knock-out (KO)] Garde-fou éliminatoire : bloque l'éligibilité quel que soit le score.
+  \item[Plafond produit] Max autorisé par produit crédit. Le plafond final ne le dépasse jamais.
+  \item[Seuil caution] Au-delà, cautionnaire(s) éligible(s) obligatoire(s).
+  \item[Voie exceptionnelle] Montant $\geq 8$M ou produit exceptionnel : passage CIC obligatoire.
+  \item[CIC / Chef / Agent] Comité d'investissement et de crédit (décision collégiale) / Chef d'agence (avis, validation simple $>70$) / Agent (monte le dossier). Override motivé possible.
+  \item[BIC] Bureau d'information sur le crédit : historique d'incidents de paiement inter-institutions. Ici compteurs seed, pas live.
+  \item[Situation fiscale] en\_regle / non\_fourni / non\_conforme. Exigible $\geq 500\,000$ FCFA.
+  \item[Preuves N1/N2/N3] N1 déclaratif, N2 pièce simple, N3 pièce vérifiée. Pondèrent la note documents.
+  \item[ESG] Exclusion environnementale/sociale/gouvernance : rejet immédiat.
+  \item[PAR30 / PAR90] Portefeuille à risque : part des encours impayés depuis $\geq 30$ / 90 jours. Cible future pour entraîner un vrai modèle.
+  \item[Impayé / Défaut] Échéance non payée / impayé durable qualifié en défaut.
+  \item[Épargne 3m/6m, Mouvements 90j] Moyennes d'épargne et activité récente. Régularité = 3m/6m.
+  \item[Sidecar ADD-only] Intégration sans toucher au core bancaire : lecture via adapter, écriture seulement dans \texttt{digiscore\_*}.
+  \item[Shadow mode] Le ML tourne en parallèle consultatif, sans effet sur la décision.
+  \item[Calibration / Brier / AUC] Adéquation proba $\leftrightarrow$ réalité / erreur quadratique / pouvoir discriminant. AUC $\approx 1$ ici = fuite, pas excellence.
+  \item[Fuite de données] Utiliser une info postérieure à la décision pour prédire : interdit.
+  \item[Point-in-time] Photo des données à la date de décision \C{applied_at}, jamais après.
+  \item[Contrefactuel] Plus petite variation (épargne, garantie, durée, ancienneté) pour franchir 71.
+  \item[Upsell] Suggestion non automatique quand la capacité dépasse la demande de 15\,\% et score $\geq 80$.
+\end{description}
+
+% ============================================================
+\section{Questions probables du jury + réponses flash}
+
+\subsection{Score et explicabilité}
+\begin{enumerate}
+  \item \textbf{Pourquoi des règles et pas du ML ?} --- Auditabilité en 72\,h, reproductible, pas d'historiques FUCEC réels. Entraîner sur le générateur = apprendre le générateur. ML en shadow pour comparer.
+  \item \textbf{Pourquoi ces 6 poids ?} --- Choix métier CDC : financier + capacité + historique = 65\,\%. Poids appris affichés en parallèle, jamais substitués.
+  \item \textbf{Détaillez le RCSD ?} --- Formule + 1,0 éliminatoire, 1,5 confort. Dettes existantes soustraites avant capacité, inversion exacte pour le plafond.
+  \item \textbf{Pourquoi un taux de 1,8\,\% ?} --- Simple indicatif annualisé, centralisé dans \C{policy.py}, inversé exactement via \C{montant_pour_service()}.
+  \item \textbf{Score 40 vs 41 ?} --- $\leq 40$ rejet avec décote plafond $\times 0{,}4$ vs $\times 0{,}75$ en zone grise. Frontière stable testée.
+  \item \textbf{Comment expliquez-vous un score à un agent ?} --- \texttt{criteres[]} (note, contribution) + \texttt{explication[]} (score/zone, RCSD, plafond, thin, creux) + \texttt{message\_humain}.
+  \item \textbf{Deux knock-outs ?} --- Tous stockés dans \texttt{knockouts[]}, un seul message selon priorité \texttt{policy.py}.
+  \item \textbf{Thin-file = refus ?} --- Non : micro-plafond \texttt{min(epargne*3, 250k)}, plancher 50k + \texttt{HISTORIQUE\_INSUFFISANT}. Voie preuves externes / BTCI (MEM-012).
+  \item \textbf{Suggestion seulement $\geq 80$ ?} --- Éviter l'upsell en zone grise.
+  \item \textbf{\texttt{montant\_eligible=0} mais \texttt{eligible=true} ?} --- Interdit par invariant : KO $\Rightarrow$ 0, \texttt{eligible} $\Rightarrow$ $>0$ + code parmi 4.
+\end{enumerate}
+
+\subsection{Plafond et risque}
+\begin{enumerate}[resume]
+  \item \textbf{Plafond $>$ demande = accord auto ?} --- Non : \texttt{eligible} = reco, \texttt{decision} humaine + \texttt{is\_override} tracé. Statuts \texttt{brouillon -> analyse -> soumis\_chef/cic -> accorde/refuse}.
+  \item \textbf{Pourquoi 8\,M vers le CIC ?} --- Seuil exceptionnel politique, garanties renforcées, décision collégiale.
+  \item \textbf{Saisonniers ?} --- Malus activité + creux tréso mois 6--8 + simulation choc \texttt{mauvaise\_recolte}.
+  \item \textbf{Garanties ?} --- Couverture + bonus/malus cautions au-delà du seuil.
+  \item \textbf{N1/N2/N3 ?} --- N1 déclaratif, N2 pièce simple, N3 vérifiée. Pondèrent documents + \texttt{preuves\_score} ML.
+\end{enumerate}
+
+\subsection{Gouvernance}
+\begin{enumerate}[resume]
+  \item \textbf{Qui tranche en 41--70 ?} --- Chef avis, CIC obligatoire.
+  \item \textbf{Override ?} --- Possible et motivé (\texttt{decision.reason}), log \texttt{audit\_log}, historisé \texttt{score\_result\_history}.
+  \item \textbf{Biais ?} --- Pas de variable ethnie/genre/zone dans le vecteur ; seuils identiques ; thin hors anomalies.
+  \item \textbf{Sidecar ?} --- Lecture via adapter, écriture uniquement \texttt{digiscore\_*}, jamais ALTER du SI partenaire.
+\end{enumerate}
+
+\subsection{ML et pièges}
+\begin{enumerate}[resume]
+  \item \textbf{AUC 1,0 = super modèle ?} --- Non : fuite, le label lit l'impayé courant et non le futur post-décision. Pipeline prouvé, pas risque réel.
+  \item \textbf{Proba 0,46 vs défaut 20\,\% ?} --- Bug v1 \texttt{class\_weight=balanced} corrigé en v2 non pondérée ; seuils 10/20/35 indicatifs à recalibrer.
+  \item \textbf{\texttt{p\_incident} = proba de défaut ?} --- Non : fréquence Monte Carlo reproductible (\texttt{seed}), pas risque crédit.
+  \item \textbf{Anomalie = fraude ?} --- Non : \texttt{a\_verifier}, jamais KO, thin exclus.
+  \item \textbf{Le ML est-il montré en démo ?} --- Oui : le modèle est accepté pour la démo en mode shadow (proba, anomalies, simulation, plafond indicatif), mais il reste hors décision : jamais \texttt{eligible}/\texttt{zone}/KO. En production, il faudra des historiques FUCEC réels pour le calibrer.
+\end{enumerate}
+
+\subsection{Données et SI}
+\begin{enumerate}[resume]
+  \item \textbf{120k lignes = robuste ?} --- Volumétrie/pagination oui, risque non. Golden 12 = contrat jury.
+  \item \textbf{Pourquoi deux cahiers ?} --- Ne pas fausser le solde agence ; thin interne reste lisible ; DigiScore n'est pas le core de toutes les IF.
+  \item \textbf{BIC live ?} --- Non : flags + compteurs seed. Connecteur live = OUT 72\,h.
+  \item \textbf{Rejouabilité ?} --- \texttt{seed=72}, \texttt{model\_version} persisté, simulation relisible, \texttt{pytest scoring/tests}.
+\end{enumerate}
+
+\end{document}
