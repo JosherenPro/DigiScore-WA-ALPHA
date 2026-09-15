@@ -21,6 +21,13 @@ def copy_csv(cur, table: str, columns: str, path: Path) -> None:
                 if not chunk:
                     break
                 cp.write(chunk)
+    # Sans ANALYZE, une table (temp ou definitive) qui vient d'etre remplie par
+    # COPY n'a pas de statistiques : le planificateur sous-estime son cardinal
+    # (heuristique par defaut ~1000 lignes) et peut choisir une boucle imbriquee
+    # sans index sur les JOIN qui suivent — des millions de lignes deviennent
+    # alors des heures au lieu de secondes. Coute quelques ms, evite ce piege
+    # a chaque INSERT ... SELECT ... JOIN stg_* qui suit un COPY.
+    cur.execute(f"ANALYZE {table}")
 
 
 def _exists(name: str) -> Path | None:
@@ -79,6 +86,12 @@ def _load_member_join(
     copy_csv(cur, stg, columns, path)
     cur.execute(insert_sql)
     print(label, cur.rowcount)
+    # La table reelle qui vient de recevoir l'INSERT...SELECT n'a pas encore
+    # de statistiques a jour (voir commentaire de copy_csv) : un JOIN suivant
+    # contre elle (ex. account_movement -> account) choisirait sinon un plan
+    # catastrophique. ANALYZE global (pas de table precise ici, cout marginal
+    # face au temps perdu par un mauvais plan).
+    cur.execute("ANALYZE")
 
 
 def main() -> None:
@@ -351,16 +364,44 @@ def main() -> None:
                         FROM stg_app s
                         JOIN member m ON m.external_code = s.external_code
                     ),
+                    agents AS (
+                        SELECT id, agency_id,
+                               row_number() OVER (PARTITION BY agency_id ORDER BY id) AS rn,
+                               count(*) OVER (PARTITION BY agency_id) AS n
+                        FROM app_user WHERE role = 'agent'
+                    ),
+                    -- Un agent par membre (pas par dossier) : le meme membre garde
+                    -- le meme agent d'un dossier a l'autre, comme un vrai portefeuille
+                    -- de clients attitres. member_id % 97 avant le %n : l'agence est
+                    -- deja assignee via (index % 2) cote generateur, donc member_id %
+                    -- 2 (ou tout petit modulo correle a 2) est CONSTANT au sein d'une
+                    -- meme agence et enverrait 100% des dossiers sur un seul agent.
+                    -- 97 est premier et sans rapport avec ce pas de 2, ce qui casse
+                    -- la correlation et repartit vraiment entre les agents.
+                    picked AS (
+                        SELECT n.*, a.id AS agent_id
+                        FROM numbered n
+                        JOIN agents a
+                          ON a.agency_id = n.agency_id
+                         AND a.rn = ((n.member_id % 97) % a.n) + 1
+                    ),
                     ins AS (
                         INSERT INTO credit_application (
                             member_id, product_id, agent_id, agency_id, purpose,
                             requested_amount, term_months, status, tax_status,
-                            has_external_credits, external_proofs_ok
+                            has_external_credits, external_proofs_ok, applied_at
                         )
-                        SELECT member_id, product_id, 1, agency_id, purpose,
+                        -- Sans ca, applied_at retombe sur DEFAULT NOW() pour les
+                        -- 20 000 lignes : meme instant pour tout le monde, donc
+                        -- aucune courbe "dossiers crees par semaine" possible cote
+                        -- dashboard agent. Etale sur ~90 jours, deterministe (pas
+                        -- d'appel random() ici).
+                        SELECT member_id, product_id, agent_id, agency_id, purpose,
                                requested_amount, term_months, status, tax_status,
-                               has_external_credits, external_proofs_ok
-                        FROM numbered
+                               has_external_credits, external_proofs_ok,
+                               NOW() - (((member_id * 37) % 90) || ' days')::interval
+                                     - (((member_id * 13) % 24) || ' hours')::interval
+                        FROM picked
                         ORDER BY rn
                         RETURNING id
                     ),
@@ -374,6 +415,10 @@ def main() -> None:
                     """
                 )
                 print("applications", cur.rowcount)
+                # credit_application et map_app viennent d'etre remplies par un
+                # INSERT...SELECT, pas un COPY : meme piege de stats perimees
+                # que dans copy_csv, avant les nombreux JOIN sur map_app qui suivent.
+                cur.execute("ANALYZE")
 
                 ie = _exists("income_expense.csv")
                 if ie:

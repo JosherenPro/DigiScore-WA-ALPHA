@@ -10,13 +10,14 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.auth import ReviewerUser, StaffUser
 from app.db import get_db
 from app.models.tables import (
     AuditLog,
+    CreditApplication,
     Member,
     OutstandingLoan,
     ParIndicator,
@@ -42,6 +43,12 @@ from app.services import portfolio_service as svc
 router = APIRouter()
 
 
+def _clamp_page(page: int, page_size: int) -> tuple[int, int, int]:
+    page = max(1, page)
+    page_size = min(max(1, page_size), 100)
+    return page, page_size, (page - 1) * page_size
+
+
 def _date(value: str | None, *, default_today: bool = True) -> date:
     if not value:
         if default_today:
@@ -54,7 +61,19 @@ def _date(value: str | None, *, default_today: bool = True) -> date:
 
 
 def _agency_scope(user) -> int | None:
-    return user.agency_id if user.role == "chef_agence" else None
+    return user.agency_id if user.role in ("chef_agence", "agent") else None
+
+
+def _agent_scope(user) -> int | None:
+    """Restreint aux membres geres par cet agent (via credit_application.agent_id).
+    None pour chef d'agence / CIC : eux voient toute l'agence."""
+    return user.id if user.role == "agent" else None
+
+
+def _agent_members_subq(agent_id: int | None):
+    if agent_id is None:
+        return None
+    return select(CreditApplication.member_id).where(CreditApplication.agent_id == agent_id).distinct()
 
 
 def _agences(db: Session, agency_id: int | None) -> list[int]:
@@ -82,8 +101,9 @@ def vision_portefeuille(
 ):
     day = _date(as_of)
     agency = _agency_scope(user)
+    agent = _agent_scope(user)
     agences = _agences(db, agency)
-    snapshots = [svc.par_snapshot(db, day, item) for item in agences]
+    snapshots = [svc.par_snapshot(db, day, item, agent) for item in agences]
     if snapshots:
         par = [
             {
@@ -124,6 +144,9 @@ def vision_portefeuille(
     )
     if agency is not None:
         stmt = stmt.where(Member.agency_id == agency)
+    members = _agent_members_subq(agent)
+    if members is not None:
+        stmt = stmt.where(Member.id.in_(members))
     alertes = []
     for loan, member in db.execute(stmt).all():
         retard = int(loan.days_late or 0)
@@ -157,6 +180,9 @@ def vision_recouvrement(
     )
     if agence is not None:
         stmt = stmt.where(Member.agency_id == agence)
+    members = _agent_members_subq(_agent_scope(user))
+    if members is not None:
+        stmt = stmt.where(Member.id.in_(members))
     dossiers = []
     for case, member in db.execute(stmt).all():
         detail = svc.niveau_detail((case.level - 1) * 30 + 1) or {}
@@ -178,7 +204,8 @@ def vision_aging(
     db: Session = Depends(get_db),
 ):
     day = _date(as_of)
-    snap = svc.par_snapshot(db, day, _agency_scope(user))
+    agency, agent = _agency_scope(user), _agent_scope(user)
+    snap = svc.par_snapshot(db, day, agency, agent)
     return {
         "as_of": day.isoformat(),
         "par1": snap["par1"],
@@ -186,7 +213,7 @@ def vision_aging(
         "par90": snap["par90"],
         "label": svc.par_label(snap["par30"]),
         "encours_brut": snap["encours_brut"],
-        "buckets": svc.aging_report(db, day, _agency_scope(user)),
+        "buckets": svc.aging_report(db, day, agency, agent),
     }
 
 
@@ -194,12 +221,23 @@ def vision_aging(
 def vision_echeances(
     user: StaffUser,
     jour: str | None = None,
-    limit: int = Query(100, ge=1, le=500),
+    q: str = "",
+    page: int = Query(1, ge=1),
+    page_size: int = Query(30, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
     day = _date(jour)
-    items = svc.echeances_du_jour(db, day, _agency_scope(user), limit=limit)
-    return {"jour": day.isoformat(), "items": [{**item, "due_on": item["due_on"].isoformat() if item["due_on"] else None, "jour": day.isoformat()} for item in items]}
+    page, page_size, offset = _clamp_page(page, page_size)
+    items, total = svc.echeances_du_jour(
+        db, day, _agency_scope(user), limit=page_size, offset=offset, agent_id=_agent_scope(user), q=q
+    )
+    return {
+        "jour": day.isoformat(),
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+        "items": [{**item, "due_on": item["due_on"].isoformat() if item["due_on"] else None, "jour": day.isoformat()} for item in items],
+    }
 
 
 @router.get("/vision/visites", tags=["vision"], response_model=VisitesOut)
@@ -210,7 +248,7 @@ def vision_visites(
     db: Session = Depends(get_db),
 ):
     day = _date(as_of)
-    items = svc.visites_a_faire(db, day, _agency_scope(user), limit=limit)
+    items = svc.visites_a_faire(db, day, _agency_scope(user), limit=limit, agent_id=_agent_scope(user))
     return {
         "as_of": day.isoformat(),
         "items": [{**item, "cible": item["cible"].isoformat()} for item in items],
@@ -263,9 +301,12 @@ def vision_dossiers(
     user: StaffUser,
     niveau: int | None = Query(None, ge=1, le=4),
     priorite: str | None = Query(None, pattern="^(P1|P2|P3|S)$"),
-    limit: int = Query(100, ge=1, le=500),
+    q: str = "",
+    page: int = Query(1, ge=1),
+    page_size: int = Query(30, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
+    page, page_size, offset = _clamp_page(page, page_size)
     agence = _agency_scope(user)
     loans = (
         select(
@@ -282,12 +323,22 @@ def vision_dossiers(
         .join(Member, Member.id == RecoveryCase.member_id)
         .outerjoin(loans, loans.c.member_id == RecoveryCase.member_id)
         .order_by(RecoveryCase.level.desc(), RecoveryCase.opened_on.desc())
-        .limit(limit)
+        # "priorite" est calculee en Python (pas une colonne), donc filtree
+        # apres la requete : on remonte un plafond large ici plutot que
+        # page_size, sinon la pagination serait fausse des qu'un filtre
+        # priorite est actif (des lignes valides resteraient hors du lot SQL).
+        .limit(2000)
     )
     if agence is not None:
         stmt = stmt.where(Member.agency_id == agence)
+    members = _agent_members_subq(_agent_scope(user))
+    if members is not None:
+        stmt = stmt.where(Member.id.in_(members))
     if niveau is not None:
         stmt = stmt.where(RecoveryCase.level == niveau)
+    if q:
+        like = f"%{q}%"
+        stmt = stmt.where(or_(Member.external_code.ilike(like), Member.last_name.ilike(like), Member.first_name.ilike(like)))
     cases = db.execute(stmt).all()
     items = []
     for case, member, retard, encours in cases:
@@ -313,7 +364,15 @@ def vision_dossiers(
         items.append(item)
     if priorite is not None:
         items = [item for item in items if item["priorite"] == priorite]
-    return {"as_of": date.today().isoformat(), "total": len(items), "items": items}
+    total = len(items)
+    page_items = items[offset : offset + page_size]
+    return {
+        "as_of": date.today().isoformat(),
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+        "items": page_items,
+    }
 
 
 @router.post(

@@ -356,11 +356,20 @@ def generate(out: Path, n: int, n_apps: int) -> dict[str, Path]:
             int(cmv * 0.15), int(ca * 0.08), rng.choice(["N1", "N2", "N3"]), rng.choice(["N1", "N2"]),
         ])
         w["wealth"].writerow([ref, int(ca * 0.2), int(ca * 0.05), int(ca * 0.08), int(ca * 0.02), False, False, False, False, False])
+        # Tresorerie a l'echelle reelle du dossier (ca/cmv/charges), pas un flux
+        # borne independamment du CA : l'ancienne formule (40k-280k / 30k-210k
+        # quel que soit ca) etait sans rapport avec des CA de 400k a 6,4M/an,
+        # ce qui rendait le simulateur de resilience structurellement voue a
+        # l'echec pour les dossiers a CA eleve. Bruit mensuel deterministe +
+        # creux saisonnier, jamais un lissage plat (cf. schema.sql).
         for m in range(1, 13):
-            inn = 40_000 + ((i_num * m * 13) % 240_000)
-            outflow = 30_000 + ((i_num * m * 17) % 180_000)
+            in_noise = 0.9 + ((i_num * m) % 5) / 25.0
+            out_noise = 0.9 + ((i_num * m * 3) % 5) / 25.0
+            inn = round((ca / 12) * in_noise)
+            outflow = round(((cmv + charges) / 12) * out_noise)
             if seasonal and m in (6, 7, 8):
-                inn, outflow = 25_000 + (i_num % 20) * 1000, 160_000 + (j % 30) * 1000
+                inn = round((ca / 12) * 0.35)
+                outflow = round(((cmv + charges) / 12) * 1.3)
             period = date(2025, m, 1)
             w["cash"].writerow([ref, m, dstr(period), inn, outflow])
         w["act"].writerow([ref, "agriculture" if seasonal else "commerce", f"Activite {code}", 8 + (i_num % 90), CITIES[i_num % len(CITIES)], seasonal, "N2"])

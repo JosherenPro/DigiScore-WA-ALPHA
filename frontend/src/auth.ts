@@ -25,5 +25,5 @@ export function clearSession() {
 export function homeFor(role: string): string {
   if (role === "cic") return "/cic";
   if (role === "chef_agence") return "/chef";
-  return "/agent";
+  return "/dashboard";
 }

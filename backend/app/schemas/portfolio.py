@@ -37,6 +37,9 @@ class EcheanceOut(BaseModel):
 
 class EcheancesOut(BaseModel):
     jour: str
+    page: int = 1
+    page_size: int = 100
+    total: int = 0
     items: list[EcheanceOut] = Field(default_factory=list)
 
 
@@ -97,6 +100,8 @@ class DossierRecouvrementRichOut(BaseModel):
 
 class DossiersOut(BaseModel):
     as_of: str
+    page: int = 1
+    page_size: int = 100
     total: int
     items: list[DossierRecouvrementRichOut] = Field(default_factory=list)
 

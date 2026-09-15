@@ -1,41 +1,44 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, money, type CompteExterne, type HistoriqueMembre, type MembreDetail, type Mouvement } from "../api/client";
 import Pager from "../components/Pager";
+import Spinner from "../components/Spinner";
+import Alert from "../components/Alert";
+import { useApi } from "../hooks/useApi";
+
+type Fiche = {
+  membre: MembreDetail;
+  hist: HistoriqueMembre;
+  mv: { items: Mouvement[]; page: number; total: number };
+  ext: CompteExterne[];
+  extMv: { items: Mouvement[]; page: number; total: number };
+};
 
 export default function Membre() {
   const { id } = useParams();
   const mid = Number(id);
-  const [m, setM] = useState<MembreDetail | null>(null);
-  const [hist, setHist] = useState<HistoriqueMembre | null>(null);
   const [mvPage, setMvPage] = useState({ items: [] as Mouvement[], page: 1, total: 0 });
-  const [ext, setExt] = useState<CompteExterne[]>([]);
   const [extMv, setExtMv] = useState({ items: [] as Mouvement[], page: 1, total: 0 });
-  const [err, setErr] = useState("");
 
-  useEffect(() => {
-    if (!mid) return;
-    setErr("");
-    Promise.all([
+  const { data, error, loading } = useApi<Fiche>(async () => {
+    const [membre, hist, mv, ext, extMvRes] = await Promise.all([
       api.membre(mid),
       api.historique(mid),
       api.mouvements(mid, 1),
       api.comptesExternes(mid),
       api.mouvementsExternes(mid, 1),
-    ])
-      .then(([fiche, h, mv, comptes, em]) => {
-        setM(fiche);
-        setHist(h);
-        setMvPage({ items: mv.items, page: mv.page, total: mv.total });
-        setExt(comptes);
-        setExtMv({ items: em.items, page: em.page, total: em.total });
-      })
-      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+    ]);
+    setMvPage(mv);
+    setExtMv(extMvRes);
+    return { membre, hist, mv, ext, extMv: extMvRes };
   }, [mid]);
 
-  if (err) return <div className="page error">{err}</div>;
-  if (!m) return <div className="page">Chargement…</div>;
+  if (error) return <div className="page"><Alert kind="error">{error}</Alert></div>;
+  if (loading || !data) return <div className="page"><Spinner /></div>;
 
+  const m = data.membre;
+  const hist = data.hist;
+  const ext = data.ext;
   const bloqué = m.statut !== "actif" || m.compte?.statut !== "actif";
 
   return (
@@ -84,7 +87,7 @@ export default function Membre() {
         </section>
       </div>
 
-      <section className="block" style={{ marginTop: "0.9rem" }}>
+      <section className="block mt-md">
         <h2>Crédits passés</h2>
         <table>
           <thead>
@@ -113,7 +116,7 @@ export default function Membre() {
         {(hist?.credits_passes || m.credits_passes).length === 0 && <p className="muted">Aucun crédit passé.</p>}
       </section>
 
-      <section className="block" style={{ marginTop: "0.9rem" }}>
+      <section className="block mt-md">
         <h2>Mouvements agence</h2>
         <p className="ledger-note">Livre de cette COOPEC seulement — pas mélangé avec un relevé ailleurs.</p>
         <table>
@@ -148,11 +151,11 @@ export default function Membre() {
       </section>
 
       {m.nb_comptes_externes > 0 && (
-        <section className="block" style={{ marginTop: "0.9rem" }}>
+        <section className="block mt-md">
           <h2>Ailleurs — autre COOPEC / banque / IMF</h2>
           <p className="ledger-note">Preuve d’historique hors agence. Pas Flooz / T-Money. Ne change pas le solde local.</p>
           {ext.map((c) => (
-            <div className="kv" key={c.id} style={{ marginBottom: "0.8rem" }}>
+            <div className="kv mb-sm" key={c.id}>
               <span>Institution</span>
               <strong>
                 {c.institution?.nom} ({c.institution?.type})

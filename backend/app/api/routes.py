@@ -1,6 +1,10 @@
-from datetime import date, datetime, timezone
+import os
+import uuid
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy import delete, exists, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -33,6 +37,9 @@ from app.models.tables import (
     FinancialInstitution,
     FinancialRatio,
     FinancialRatioHistory,
+    Guarantor,
+    ApplicationGuarantor,
+    GuarantorReview,
     Household,
     IncomeExpense,
     Incident,
@@ -61,6 +68,7 @@ from app.schemas.dossier import (
     DemandeCreate,
     DemandeCreateOut,
     DemandeDetail,
+    DemandeStatsOut,
     InstitutionOut,
     LoginIn,
     LoginOut,
@@ -71,6 +79,7 @@ from app.schemas.dossier import (
     PageMembres,
     PageMouvements,
     PieceIn,
+    PieceUploadOut,
     ProduitOut,
     ReferentielsOut,
     SoumettreOut,
@@ -84,6 +93,13 @@ from digiscore.pipeline import run
 from digiscore.types import ScoreResult as ScoringOut
 
 router = APIRouter()
+
+# Stockage local des pièces uploadées (démo/pilote). Chemin relatif au process
+# backend ; servi statiquement par app.main sur /uploads. En pilote, un vrai
+# stockage objet (S3-compatible) remplacerait ce dossier local.
+UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "uploads"))
+UPLOAD_MAX_BYTES = 8 * 1024 * 1024
+UPLOAD_IMAGE_TYPES = ("image/jpeg", "image/png", "image/webp", "image/heic", "image/heif")
 
 ENGINE_VERSION = "rules-v1"
 AVIS_OK = frozenset({"renvoyer", "escalader", "accorder", "valider", "conditionner", "refuser"})
@@ -659,26 +675,127 @@ def add_piece(demande_id: int, body: PieceIn, _user: AgentUser, db: Session = De
     return {"ok": True}
 
 
+@router.post("/demandes/{demande_id}/pieces/upload", tags=["demandes"], response_model=PieceUploadOut)
+async def upload_piece(
+    demande_id: int,
+    _user: AgentUser,
+    type_piece: str = Form(...),
+    qualite_ocr: str = Form(...),
+    fichier: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Vraie prise de photo (caméra ou fichier) : enregistre les octets sur
+    disque, contrairement à POST /pieces qui ne prend qu'un nom de fichier."""
+    if not db.get(CreditApplication, demande_id):
+        raise HTTPException(404, "Demande introuvable")
+    if qualite_ocr in ("flou", "sombre", "coupe"):
+        raise HTTPException(400, "Qualite photo insuffisante : recommencer la prise")
+    if fichier.content_type and fichier.content_type not in UPLOAD_IMAGE_TYPES:
+        raise HTTPException(400, "Format de fichier non supporte (image attendue)")
+    content = await fichier.read()
+    if not content:
+        raise HTTPException(400, "Fichier vide")
+    if len(content) > UPLOAD_MAX_BYTES:
+        raise HTTPException(400, "Photo trop lourde (max 8 Mo)")
+    ext = Path(fichier.filename or "photo.jpg").suffix[:8] or ".jpg"
+    rel_path = f"pieces/{demande_id}/{uuid.uuid4().hex}{ext}"
+    dest = UPLOAD_DIR / rel_path
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(content)
+    db.add(
+        SupportingDocument(
+            application_id=demande_id,
+            document_type=type_piece,
+            file_path=rel_path,
+            ocr_quality=qualite_ocr,
+            status="recu",
+        )
+    )
+    db.commit()
+    return {"ok": True, "fichier": rel_path}
+
+
+@router.get("/uploads/{path:path}", tags=["demandes"])
+def get_upload(path: str, _user: StaffUser):
+    """Sert une pièce uploadée. Authentifié comme le reste de l'API : une
+    pièce d'identité / fiscale ne doit pas être une URL publique devinable."""
+    root = UPLOAD_DIR.resolve()
+    target = (root / path).resolve()
+    if root not in target.parents or not target.is_file():
+        raise HTTPException(404, "Fichier introuvable")
+    return FileResponse(target)
+
+
 @router.get("/demandes", tags=["demandes"], response_model=PageDemandes)
 def list_demandes(
     _user: StaffUser,
     statut: str | None = None,
+    q: str = "",
     page: int = Query(1, ge=1),
     page_size: int = Query(30, ge=1, le=100),
     membre_id: int | None = None,
+    agent_id: int | None = None,
     db: Session = Depends(get_db),
 ):
     page, page_size, offset = _clamp_page(page, page_size)
     stmt = select(CreditApplication)
     if statut:
-        stmt = stmt.where(CreditApplication.status == statut)
+        # "soumis_chef,soumis_cic" -> IN (...) : un seul param plutot qu'une
+        # liste repetee dans l'URL, pour le filtre "en cours de traitement"
+        # (chez le chef OU au CIC) de la page Dossiers.
+        statuts = [s.strip() for s in statut.split(",") if s.strip()]
+        stmt = stmt.where(CreditApplication.status.in_(statuts)) if len(statuts) > 1 else stmt.where(CreditApplication.status == statuts[0])
+    if q:
+        # Recherche contextuelle sur la page Dossiers : meme logique que
+        # /membres (nom, prenom, code externe), mais restreinte aux dossiers
+        # deja dans le perimetre courant (statut/agent).
+        like = f"%{q}%"
+        stmt = stmt.where(
+            CreditApplication.member_id.in_(
+                select(Member.id).where(
+                    or_(
+                        Member.external_code.ilike(like),
+                        Member.last_name.ilike(like),
+                        Member.first_name.ilike(like),
+                    )
+                )
+            )
+        )
     if membre_id:
         stmt = stmt.where(CreditApplication.member_id == membre_id)
+    if agent_id:
+        stmt = stmt.where(CreditApplication.agent_id == agent_id)
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = db.scalars(stmt.order_by(CreditApplication.id.desc()).offset(offset).limit(page_size)).all()
+
+    member_ids = {d.member_id for d in rows}
+    members_by_id = (
+        {m.id: m for m in db.scalars(select(Member).where(Member.id.in_(member_ids)))} if member_ids else {}
+    )
+    incident_counts = dict(
+        db.execute(
+            select(Incident.member_id, func.count())
+            .where(Incident.member_id.in_(member_ids))
+            .group_by(Incident.member_id)
+        ).all()
+    ) if member_ids else {}
+    # "Bon historique" = au moins un crédit soldé sans retard (même définition
+    # que hist_bonus dans scoring/digiscore/limits.py — pas une notion inventee ici).
+    clean_history_ids = set(
+        db.scalars(
+            select(PastCredit.member_id)
+            .where(
+                PastCredit.member_id.in_(member_ids),
+                PastCredit.status == "solde",
+                PastCredit.late_count == 0,
+            )
+            .distinct()
+        )
+    ) if member_ids else set()
+
     items = []
     for d in rows:
-        m = db.get(Member, d.member_id)
+        m = members_by_id.get(d.member_id)
         sc = db.scalars(select(ScoreResult).where(ScoreResult.application_id == d.id)).first()
         score = float(sc.score_total) if sc else None
         items.append(
@@ -686,14 +803,87 @@ def list_demandes(
                 "id": d.id,
                 "membre": f"{m.first_name} {m.last_name}" if m else "",
                 "membre_id": d.member_id,
+                "code_externe": m.external_code if m else None,
+                "membre_statut": m.status if m else None,
                 "montant_demande": float(d.requested_amount),
                 "statut": d.status,
                 "score": score,
                 "message_code": sc.message_code if sc else None,
                 "zone": _zone_score(score),
+                "agent_id": d.agent_id,
+                "nb_incidents": int(incident_counts.get(d.member_id, 0)),
+                "bon_historique": d.member_id in clean_history_ids,
             }
         )
     return {"items": items, "page": page, "page_size": page_size, "total": total}
+
+
+@router.get("/demandes/stats", tags=["demandes"], response_model=DemandeStatsOut)
+def demandes_stats(
+    _user: StaffUser,
+    agent_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    """Agrégats pour le tableau de bord agent — une seule requête, pas de
+    boucle par dossier : un portefeuille de plusieurs milliers de demandes
+    doit rester instantané."""
+    stmt = select(
+        CreditApplication.status,
+        CreditApplication.requested_amount,
+        CreditApplication.has_external_credits,
+        CreditApplication.applied_at,
+        ScoreResult.score_total,
+        ScoreResult.eligible_amount,
+    ).select_from(CreditApplication).outerjoin(
+        ScoreResult, ScoreResult.application_id == CreditApplication.id
+    )
+    if agent_id:
+        stmt = stmt.where(CreditApplication.agent_id == agent_id)
+    rows = db.execute(stmt).all()
+
+    par_statut: dict[str, int] = {}
+    par_zone: dict[str, int] = {}
+    scores: list[float] = []
+    montant_demande = 0.0
+    montant_eligible = 0.0
+    nb_credits_ailleurs = 0
+    par_semaine: dict[date, int] = {}
+
+    for status, requested, has_external, applied_at, score_total, eligible_amount in rows:
+        par_statut[status] = par_statut.get(status, 0) + 1
+        montant_demande += float(requested or 0)
+        if has_external:
+            nb_credits_ailleurs += 1
+        if score_total is not None:
+            score = float(score_total)
+            scores.append(score)
+            montant_eligible += float(eligible_amount or 0)
+            zone = _zone_score(score) or "non_analyse"
+        else:
+            zone = "non_analyse"
+        par_zone[zone] = par_zone.get(zone, 0) + 1
+        if applied_at:
+            semaine = applied_at.date() - timedelta(days=applied_at.weekday())
+            par_semaine[semaine] = par_semaine.get(semaine, 0) + 1
+
+    # Courbe : les 12 dernieres semaines qui ont vraiment une demande (pas de
+    # semaines vides inventees pour "faire joli" — cf. dates du seed, pas la
+    # semaine calendaire courante).
+    serie = [
+        {"date": d.isoformat(), "total": n}
+        for d, n in sorted(par_semaine.items())
+    ][-12:]
+
+    return {
+        "total": len(rows),
+        "par_statut": par_statut,
+        "par_zone": par_zone,
+        "score_moyen": round(sum(scores) / len(scores), 1) if scores else None,
+        "montant_total_demande": montant_demande,
+        "serie_creations": serie,
+        "montant_total_eligible": montant_eligible,
+        "nb_credits_ailleurs": nb_credits_ailleurs,
+    }
 
 
 @router.get("/demandes/{demande_id}", tags=["demandes"], response_model=DemandeDetail)
@@ -705,6 +895,44 @@ def get_demande(demande_id: int, _user: StaffUser, db: Session = Depends(get_db)
     ratios = db.scalars(select(FinancialRatio).where(FinancialRatio.application_id == d.id)).first()
     decs = db.scalars(select(Decision).where(Decision.application_id == d.id)).all()
     pieces = db.scalars(select(SupportingDocument).where(SupportingDocument.application_id == d.id)).all()
+    ag_links = db.execute(
+        select(ApplicationGuarantor, Guarantor)
+        .join(Guarantor, Guarantor.id == ApplicationGuarantor.guarantor_id)
+        .where(ApplicationGuarantor.application_id == d.id)
+    ).all()
+    reviews_by_link = {}
+    if ag_links:
+        for review in db.scalars(
+            select(GuarantorReview).where(
+                GuarantorReview.application_guarantor_id.in_([link.id for link, _ in ag_links])
+            )
+        ).all():
+            reviews_by_link[review.application_guarantor_id] = review
+    cautions = []
+    for link, garant in ag_links:
+        review = reviews_by_link.get(link.id)
+        cautions.append(
+            {
+                "nom": garant.last_name,
+                "prenom": garant.first_name,
+                "telephone": garant.phone,
+                "relation": garant.relationship,
+                "type_caution": link.guarantee_type,
+                "montant_engage": float(link.pledged_amount or 0),
+                "membre_existant": garant.member_id is not None,
+                "revue": None
+                if not review
+                else {
+                    "revenu": float(review.income or 0),
+                    "charges": float(review.expenses or 0),
+                    "caf_relais": float(review.relay_caf) if review.relay_caf is not None else None,
+                    "rcsd_relais": float(review.relay_rcsd) if review.relay_rcsd is not None else None,
+                    "score_relais": float(review.relay_score) if review.relay_score is not None else None,
+                    "eligible": bool(review.eligible),
+                    "motif": review.reason,
+                },
+            }
+        )
     score_val = float(sc.score_total) if sc else None
     membre = db.get(Member, d.member_id)
     prod = db.get(CreditProduct, d.product_id)
@@ -756,7 +984,11 @@ def get_demande(demande_id: int, _user: StaffUser, db: Session = Depends(get_db)
             {"niveau": x.level, "avis": x.opinion, "motif": x.reason, "override": x.is_override}
             for x in decs
         ],
-        "pieces": [{"type_piece": p.document_type, "qualite_ocr": p.ocr_quality} for p in pieces],
+        "pieces": [
+            {"type_piece": p.document_type, "qualite_ocr": p.ocr_quality, "fichier": p.file_path}
+            for p in pieces
+        ],
+        "cautions": cautions,
         "collecte": None
         if not ie
         else {
@@ -1176,20 +1408,22 @@ def amortissement(
 @router.get("/files/chef", tags=["workflow"], response_model=PageDemandes)
 def file_chef(
     user: ReviewerUser,
+    q: str = "",
     page: int = Query(1, ge=1),
     page_size: int = Query(30, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
     if user.role not in ("chef_agence", "cic"):
         raise HTTPException(403, "File chef reservee")
-    return list_demandes(user, statut="soumis_chef", page=page, page_size=page_size, db=db)
+    return list_demandes(user, statut="soumis_chef", q=q, page=page, page_size=page_size, db=db)
 
 
 @router.get("/files/cic", tags=["workflow"], response_model=PageDemandes)
 def file_cic(
     _user: CicUser,
+    q: str = "",
     page: int = Query(1, ge=1),
     page_size: int = Query(30, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    return list_demandes(_user, statut="soumis_cic", page=page, page_size=page_size, db=db)
+    return list_demandes(_user, statut="soumis_cic", q=q, page=page, page_size=page_size, db=db)

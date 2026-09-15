@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth import ReviewerUser, StaffUser
+from app.auth import StaffUser
 from app.db import get_db
 from app.models.tables import Activity, CreditApplication
 from app.schemas.ml import (
@@ -129,13 +129,14 @@ def get_simulations(
 
 @router.get("/portefeuille/alertes", tags=["ml"], response_model=AlertesOut)
 def get_alertes(
-    user: ReviewerUser,
+    user: StaffUser,
     limit: int = Query(20, ge=1, le=100),
     _ml: None = Depends(require_ml),
     db: Session = Depends(get_db),
 ):
-    agency_id = user.agency_id if user.role == "chef_agence" else None
-    return list_alerts(db, limit=limit, agency_id=agency_id)
+    agency_id = user.agency_id if user.role in ("chef_agence", "agent") else None
+    agent_id = user.id if user.role == "agent" else None
+    return list_alerts(db, limit=limit, agency_id=agency_id, agent_id=agent_id)
 
 
 @router.get(

@@ -199,14 +199,25 @@ def prochaine_visite(
     return None
 
 
-def _loan_scope(db: Session, agency_id: int | None):
+def _agent_members(agent_id: int | None):
+    """Sous-requete des membres geres par cet agent (agent_id sur ses demandes) ;
+    None si pas de restriction par agent (chef d'agence / CIC voient l'agence entiere)."""
+    if agent_id is None:
+        return None
+    return select(CreditApplication.member_id).where(CreditApplication.agent_id == agent_id).distinct()
+
+
+def _loan_scope(db: Session, agency_id: int | None, agent_id: int | None = None):
     stmt = select(OutstandingLoan).join(Member, Member.id == OutstandingLoan.member_id)
     if agency_id is not None:
         stmt = stmt.where(Member.agency_id == agency_id)
+    members = _agent_members(agent_id)
+    if members is not None:
+        stmt = stmt.where(Member.id.in_(members))
     return stmt
 
 
-def par_snapshot(db: Session, as_of: date, agency_id: int | None = None) -> dict[str, Any]:
+def par_snapshot(db: Session, as_of: date, agency_id: int | None = None, agent_id: int | None = None) -> dict[str, Any]:
     stmt = (
         select(
             func.coalesce(func.sum(OutstandingLoan.outstanding), 0),
@@ -252,6 +263,9 @@ def par_snapshot(db: Session, as_of: date, agency_id: int | None = None) -> dict
     )
     if agency_id is not None:
         stmt = stmt.where(Member.agency_id == agency_id)
+    members = _agent_members(agent_id)
+    if members is not None:
+        stmt = stmt.where(Member.id.in_(members))
     brut, restructured, late1, late30, late90 = db.execute(stmt).one()
     brut, restructured, late1, late30, late90 = (
         float(brut),
@@ -317,9 +331,9 @@ def recalculer_par(db: Session, as_of: date) -> list[dict[str, Any]]:
     return snapshots
 
 
-def aging_report(db: Session, as_of: date, agency_id: int | None = None) -> list[dict[str, Any]]:
+def aging_report(db: Session, as_of: date, agency_id: int | None = None, agent_id: int | None = None) -> list[dict[str, Any]]:
     rows = db.execute(
-        _loan_scope(db, agency_id).with_only_columns(
+        _loan_scope(db, agency_id, agent_id).with_only_columns(
             OutstandingLoan.outstanding, OutstandingLoan.days_late
         )
     ).all()
@@ -356,16 +370,33 @@ def indicateurs_recuperation(db: Session) -> dict[str, Any]:
     }
 
 
-def echeances_du_jour(db: Session, jour: date, agency_id: int | None = None, limit: int = 100) -> list[dict[str, Any]]:
-    stmt = (
+def echeances_du_jour(
+    db: Session,
+    jour: date,
+    agency_id: int | None = None,
+    limit: int = 100,
+    agent_id: int | None = None,
+    offset: int = 0,
+    q: str = "",
+) -> tuple[list[dict[str, Any]], int]:
+    base = (
         select(OutstandingLoan, Member)
         .join(Member, Member.id == OutstandingLoan.member_id)
         .where(OutstandingLoan.status != "solde", OutstandingLoan.days_late > 0)
-        .order_by(OutstandingLoan.days_late.desc(), OutstandingLoan.outstanding.desc())
-        .limit(limit)
     )
     if agency_id is not None:
-        stmt = stmt.where(Member.agency_id == agency_id)
+        base = base.where(Member.agency_id == agency_id)
+    members = _agent_members(agent_id)
+    if members is not None:
+        base = base.where(Member.id.in_(members))
+    if q:
+        # Recherche server-side (pas un filtre client sur la page courante) :
+        # sinon taper un nom absent de la page affichee donnerait "0 resultat"
+        # a tort alors que le dossier existe plus loin dans la pagination.
+        like = f"%{q}%"
+        base = base.where(or_(Member.external_code.ilike(like), Member.last_name.ilike(like), Member.first_name.ilike(like)))
+    total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
+    stmt = base.order_by(OutstandingLoan.days_late.desc(), OutstandingLoan.outstanding.desc()).offset(offset).limit(limit)
     items: list[dict[str, Any]] = []
     for loan, member in db.execute(stmt).all():
         retard = int(loan.days_late or 0)
@@ -386,7 +417,7 @@ def echeances_du_jour(db: Session, jour: date, agency_id: int | None = None, lim
                 "jour": jour,
             }
         )
-    return items
+    return items, total
 
 
 def visites_a_faire(
@@ -394,6 +425,7 @@ def visites_a_faire(
     as_of: date,
     agency_id: int | None = None,
     limit: int = 50,
+    agent_id: int | None = None,
 ) -> list[dict[str, Any]]:
     rows = db.execute(
         select(OutstandingLoan, Member)
@@ -402,6 +434,9 @@ def visites_a_faire(
     ).all()
     if agency_id is not None:
         rows = [(loan, member) for loan, member in rows if member.agency_id == agency_id]
+    if agent_id is not None:
+        owned = set(db.scalars(_agent_members(agent_id)).all())
+        rows = [(loan, member) for loan, member in rows if member.id in owned]
     member_ids = [member.id for _, member in rows]
     suivis: dict[int, list[str]] = {}
     if member_ids:

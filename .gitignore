@@ -14,3 +14,4 @@ resoure/
 resource/
 data/synthetic/volume/*.csv
 data/synthetic/volume/MANIFEST.txt
+backend/uploads/

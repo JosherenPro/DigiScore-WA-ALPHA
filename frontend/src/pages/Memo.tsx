@@ -1,20 +1,21 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, money, type AmortOut, type MemoOut } from "../api/client";
+import Spinner from "../components/Spinner";
+import Alert from "../components/Alert";
+import { useApi } from "../hooks/useApi";
 
 export default function Memo() {
   const { id } = useParams();
-  const [m, setM] = useState<MemoOut | null>(null);
+  const { data: m, error, loading } = useApi<MemoOut>(() => api.memo(Number(id)), [id]);
   const [am, setAm] = useState<AmortOut | null>(null);
-  const [err, setErr] = useState("");
 
   useEffect(() => {
-    api.memo(Number(id)).then(setM).catch((e) => setErr(e instanceof Error ? e.message : String(e)));
     api.amortissement(Number(id)).then(setAm).catch(() => undefined);
   }, [id]);
 
-  if (err) return <div className="page error">{err}</div>;
-  if (!m) return <div className="page">Chargement…</div>;
+  if (error) return <div className="page"><Alert kind="error">{error}</Alert></div>;
+  if (loading || !m) return <div className="page"><Spinner /></div>;
 
   return (
     <div className="page">
@@ -40,14 +41,14 @@ export default function Memo() {
           )}
         </div>
       </section>
-      <section className="block" style={{ marginTop: "0.9rem" }}>
+      <section className="block mt-md">
         <h2>Rubriques comité</h2>
         {m.rubriques.map((r) => (
           <p key={r}>{r}</p>
         ))}
       </section>
       {am && (
-        <section className="block" style={{ marginTop: "0.9rem" }}>
+        <section className="block mt-md">
           <h2>
             Amortissement sur le montant éligible ({money(am.montant)} / {am.duree_mois} mois)
           </h2>
