@@ -1,0 +1,14 @@
+node_modules
+frontend/node_modules
+frontend/dist
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+.git
+data/synthetic/volume
+backend/uploads
+*.log
+.idea
+.DS_Store
