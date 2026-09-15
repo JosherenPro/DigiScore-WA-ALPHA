@@ -21,3 +21,6 @@ backend/uploads/
 *.log
 *.out
 *.toc
+
+# Vercel CLI
+.vercel/
