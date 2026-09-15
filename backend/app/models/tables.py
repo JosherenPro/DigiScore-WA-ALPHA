@@ -315,7 +315,13 @@ class GuarantorReview(Base):
     __tablename__ = "guarantor_review"
     id = mapped_column(Integer, primary_key=True)
     application_guarantor_id = mapped_column(Integer)
+    income = mapped_column(Numeric)
+    expenses = mapped_column(Numeric)
+    relay_caf = mapped_column(Numeric)
+    relay_rcsd = mapped_column(Numeric)
+    relay_score = mapped_column(Numeric)
     eligible = mapped_column(Boolean)
+    reason = mapped_column(Text)
 
 
 class ApplicationGuarantor(Base):
@@ -323,6 +329,18 @@ class ApplicationGuarantor(Base):
     id = mapped_column(Integer, primary_key=True)
     application_id = mapped_column(Integer)
     guarantor_id = mapped_column(Integer)
+    guarantee_type = mapped_column(String)
+    pledged_amount = mapped_column(Numeric)
+
+
+class Guarantor(Base):
+    __tablename__ = "guarantor"
+    id = mapped_column(Integer, primary_key=True)
+    last_name = mapped_column(String)
+    first_name = mapped_column(String)
+    phone = mapped_column(String)
+    relationship = mapped_column(String)
+    member_id = mapped_column(Integer)
 
 
 class ScoreResult(Base):
@@ -374,7 +392,7 @@ class Decision(Base):
     level = mapped_column(String)
     opinion = mapped_column(String)
     reason = mapped_column(Text)
-    is_override = mapped_column(Boolean)
+    is_override = mapped_column(Boolean, default=False)
     user_id = mapped_column(Integer)
 
 

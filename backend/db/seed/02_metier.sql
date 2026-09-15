@@ -16,10 +16,18 @@ INSERT INTO credit_product (code, label, min_amount, max_amount, max_term_months
     ('AGR-SAI', 'Credit agricole saisonnier', 100000, 2500000, 12, 0.016, 2000000, 1, FALSE),
     ('EXC-10M', 'Credit exceptionnel CIC', 5000000, 12000000, 36, 0.015, 2000000, 2, TRUE);
 
+-- Plusieurs agents par agence (pas juste 'agent'/id=1) : sans ca, "mes dossiers"
+-- et "base complete" affichent toujours le meme total sur la page Dossiers, vu
+-- que credit_application.agent_id etait fige a 1 pour tout le monde. Ces comptes
+-- ne sont pas connectables depuis l'ecran de connexion (ROLES n'a que agent/chef/cic)
+-- : ce sont uniquement des proprietaires de dossiers pour la repartition du volume.
 INSERT INTO app_user (login, full_name, role, agency_id, password_hash) VALUES
     ('agent', 'Ama Agent', 'agent', 1, '$2b$12$9OfpiTAhhmsHN9nRwDdFLOf7DiSl.eSp0MhZBA0Iu8Ypca.jMW1iC'),
     ('chef', 'Koffi Chef', 'chef_agence', 1, '$2b$12$9OfpiTAhhmsHN9nRwDdFLOf7DiSl.eSp0MhZBA0Iu8Ypca.jMW1iC'),
-    ('cic', 'Comite CIC', 'cic', 1, '$2b$12$9OfpiTAhhmsHN9nRwDdFLOf7DiSl.eSp0MhZBA0Iu8Ypca.jMW1iC');
+    ('cic', 'Comite CIC', 'cic', 1, '$2b$12$9OfpiTAhhmsHN9nRwDdFLOf7DiSl.eSp0MhZBA0Iu8Ypca.jMW1iC'),
+    ('agent2', 'Yawa Sena', 'agent', 1, '$2b$12$9OfpiTAhhmsHN9nRwDdFLOf7DiSl.eSp0MhZBA0Iu8Ypca.jMW1iC'),
+    ('agent3', 'Kokou Amewou', 'agent', 2, '$2b$12$9OfpiTAhhmsHN9nRwDdFLOf7DiSl.eSp0MhZBA0Iu8Ypca.jMW1iC'),
+    ('agent4', 'Afi Dogbe', 'agent', 2, '$2b$12$9OfpiTAhhmsHN9nRwDdFLOf7DiSl.eSp0MhZBA0Iu8Ypca.jMW1iC');
 
 INSERT INTO member (external_code, last_name, first_name, gender, phone, area, agency_id, joined_on, status, marital_status, occupation) VALUES
     ('MEM-001', 'Mensah', 'Kodjo', 'M', '90111111', 'urbaine', 1, '2021-03-01', 'actif', 'marie', 'commercant'),
@@ -167,6 +175,13 @@ INSERT INTO credit_application (member_id, product_id, agent_id, agency_id, purp
     (11, 1, 1, 1, 'Dossier override demo', 400000, 10, 'soumis_chef', 'en_regle', FALSE, TRUE, FALSE),
     (12, 1, 1, 1, 'Credit avec preuves externes', 350000, 10, 'brouillon', 'en_regle', TRUE, TRUE, FALSE);
 
+-- Sans ca, applied_at retombe sur DEFAULT NOW() pour les 11 lignes : meme
+-- instant pour toutes, donc aucune courbe "dossiers crees par semaine"
+-- possible cote dashboard agent. Etale sur les dernieres semaines.
+UPDATE credit_application
+SET applied_at = NOW() - ((member_id * 6) || ' days')::interval
+WHERE member_id BETWEEN 1 AND 12;
+
 INSERT INTO income_expense (application_id, revenue, cogs, operating_costs, financial_income, main_activity_income, secondary_income, spouse_income, personal_income, rent_cost, school_cost, existing_debt_service, family_cost, equity, total_debt, total_assets, current_assets, current_liabilities, avg_inventory, net_income, income_proof_level, expense_proof_level) VALUES
     (1,  3600000, 1800000, 600000, 20000, 1200000, 100000, 80000, 200000, 60000, 40000, 0, 80000, 800000, 200000, 1500000, 700000, 250000, 300000, 400000, 'N3', 'N2'),
     (2,  2800000, 1500000, 500000, 10000, 800000, 50000, 40000, 150000, 50000, 30000, 20000, 70000, 500000, 300000, 1100000, 500000, 280000, 250000, 200000, 'N2', 'N2'),
@@ -222,11 +237,34 @@ INSERT INTO market (application_id, high_season, low_season, daily_volume, compe
     (6, 'oct-dec', 'juin-aout', 8, 3, TRUE, 'N2'),
     (9, 'toute_annee', 'juin', 25, 4, FALSE, 'N3');
 
+-- Tresorerie a l'echelle reelle de chaque dossier (revenue/cogs/operating_costs
+-- d'income_expense), pas un flux plat identique pour tous : un flux uniforme a
+-- 200k/160k etait ~7x trop petit pour le dossier 9 (CA 18M/an) et surestimait
+-- le dossier 4 (CA 900k/an), ce qui rendait le simulateur de resilience
+-- structurellement voue a l'echec (creux < 0 des le mois 1) independamment du
+-- scenario choisi. Bruit mensuel deterministe + creux saisonnier (dossier 6,
+-- agriculture) : jamais un lissage plat du CA annuel (cf. commentaire schema.sql).
 INSERT INTO monthly_cashflow (application_id, month_no, period_month, inflow, outflow)
-SELECT d, m, make_date(2025, m, 1),
-    CASE WHEN d = 6 AND m IN (6, 7, 8) THEN 40000 ELSE 200000 END,
-    CASE WHEN d = 6 AND m IN (6, 7, 8) THEN 180000 ELSE 160000 END
-FROM generate_series(1, 11) AS d, generate_series(1, 12) AS m;
+SELECT
+    ie.application_id, m, make_date(2025, m, 1),
+    ROUND(
+        (ie.revenue::numeric / 12)
+        * CASE
+            WHEN a.is_seasonal AND m IN (6, 7, 8) THEN 0.35
+            ELSE 0.9 + ((ie.application_id * m) % 5) / 25.0
+          END
+    ),
+    ROUND(
+        ((ie.cogs + ie.operating_costs)::numeric / 12)
+        * CASE
+            WHEN a.is_seasonal AND m IN (6, 7, 8) THEN 1.3
+            ELSE 0.9 + ((ie.application_id * m * 3) % 5) / 25.0
+          END
+    )
+FROM income_expense ie
+JOIN activity a ON a.application_id = ie.application_id
+CROSS JOIN generate_series(1, 12) AS m
+WHERE ie.application_id BETWEEN 1 AND 11;
 
 INSERT INTO application_guarantee (application_id, kind, value_amount, proof_level) VALUES
     (1, 'Stock', 350000, 'N2'),

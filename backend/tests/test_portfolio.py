@@ -72,7 +72,7 @@ def test_vision_aging_echeances_visites():
     buckets = aging.json()["buckets"]
     assert [b["bucket"] for b in buckets] == list(svc.BUCKETS)
 
-    ech = client.get("/vision/echeances?limit=3", headers=h)
+    ech = client.get("/vision/echeances?page_size=3", headers=h)
     assert ech.status_code == 200
     assert len(ech.json()["items"]) <= 3
 
@@ -88,9 +88,10 @@ def test_vision_recouvrement_et_signaux():
     dossiers = m7.json()["dossiers"]
     assert dossiers and {"membre_id", "niveau", "action", "responsable"} <= set(dossiers[0])
 
-    rich = client.get("/vision/recouvrement/dossiers?limit=5", headers=h)
+    rich = client.get("/vision/recouvrement/dossiers?page_size=5", headers=h)
     assert rich.status_code == 200
     assert rich.json()["total"] > 0
+    assert len(rich.json()["items"]) <= 5
 
     signaux = client.get("/vision/signaux", headers=h)
     assert signaux.status_code == 200
@@ -119,7 +120,7 @@ def test_log_visite_et_cleanup():
 
 def test_action_recouvrement_et_cleanup():
     h = _headers("chef")
-    dossiers = client.get("/vision/recouvrement/dossiers?limit=1", headers=h).json()["items"]
+    dossiers = client.get("/vision/recouvrement/dossiers?page_size=1", headers=h).json()["items"]
     case_id = dossiers[0]["case_id"]
     with SessionLocal() as db:
         case = db.get(RecoveryCase, case_id)

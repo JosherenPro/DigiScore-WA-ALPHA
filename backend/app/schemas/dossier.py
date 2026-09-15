@@ -230,11 +230,16 @@ class DemandeListItem(BaseModel):
     id: int
     membre: str
     membre_id: int
+    code_externe: str | None = None
+    membre_statut: str | None = None
     montant_demande: float
     statut: str
     score: float | None = None
     message_code: str | None = None
     zone: str | None = None
+    agent_id: int | None = None
+    nb_incidents: int = 0
+    bon_historique: bool = False
 
 
 class PageDemandes(BaseModel):
@@ -242,6 +247,22 @@ class PageDemandes(BaseModel):
     page: int
     page_size: int
     total: int
+
+
+class SerieCreationPoint(BaseModel):
+    date: str
+    total: int
+
+
+class DemandeStatsOut(BaseModel):
+    total: int
+    par_statut: dict[str, int] = {}
+    par_zone: dict[str, int] = {}
+    score_moyen: float | None = None
+    montant_total_demande: float = 0
+    montant_total_eligible: float = 0
+    nb_credits_ailleurs: int = 0
+    serie_creations: list[SerieCreationPoint] = []
 
 
 class ScoreBloc(BaseModel):
@@ -274,6 +295,33 @@ class DecisionOut(BaseModel):
 class PieceOut(BaseModel):
     type_piece: str
     qualite_ocr: str | None = None
+    fichier: str | None = None
+
+
+class PieceUploadOut(BaseModel):
+    ok: bool = True
+    fichier: str
+
+
+class CautionReviewOut(BaseModel):
+    revenu: float
+    charges: float
+    caf_relais: float | None = None
+    rcsd_relais: float | None = None
+    score_relais: float | None = None
+    eligible: bool
+    motif: str | None = None
+
+
+class CautionOut(BaseModel):
+    nom: str
+    prenom: str
+    telephone: str | None = None
+    relation: str | None = None
+    type_caution: str
+    montant_engage: float
+    membre_existant: bool
+    revue: CautionReviewOut | None = None
 
 
 class DemandeDetail(BaseModel):
@@ -291,6 +339,7 @@ class DemandeDetail(BaseModel):
     ratios: RatiosOut | None = None
     decisions: list[DecisionOut] = Field(default_factory=list)
     pieces: list[PieceOut] = Field(default_factory=list)
+    cautions: list[CautionOut] = Field(default_factory=list)
     collecte: dict | None = None
     tresorerie: list[dict] = Field(default_factory=list)
     patrimoine: dict | None = None

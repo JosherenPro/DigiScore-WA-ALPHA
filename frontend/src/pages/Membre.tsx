@@ -1,19 +1,44 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, money, type MembreDetail } from "../api/client";
+import { api, money, type CompteExterne, type HistoriqueMembre, type MembreDetail, type Mouvement } from "../api/client";
+import Pager from "../components/Pager";
+import Spinner from "../components/Spinner";
+import Alert from "../components/Alert";
+import { useApi } from "../hooks/useApi";
+
+type Fiche = {
+  membre: MembreDetail;
+  hist: HistoriqueMembre;
+  mv: { items: Mouvement[]; page: number; total: number };
+  ext: CompteExterne[];
+  extMv: { items: Mouvement[]; page: number; total: number };
+};
 
 export default function Membre() {
   const { id } = useParams();
-  const [m, setM] = useState<MembreDetail | null>(null);
-  const [err, setErr] = useState("");
+  const mid = Number(id);
+  const [mvPage, setMvPage] = useState({ items: [] as Mouvement[], page: 1, total: 0 });
+  const [extMv, setExtMv] = useState({ items: [] as Mouvement[], page: 1, total: 0 });
 
-  useEffect(() => {
-    api.membre(Number(id)).then(setM).catch((e) => setErr(String(e)));
-  }, [id]);
+  const { data, error, loading } = useApi<Fiche>(async () => {
+    const [membre, hist, mv, ext, extMvRes] = await Promise.all([
+      api.membre(mid),
+      api.historique(mid),
+      api.mouvements(mid, 1),
+      api.comptesExternes(mid),
+      api.mouvementsExternes(mid, 1),
+    ]);
+    setMvPage(mv);
+    setExtMv(extMvRes);
+    return { membre, hist, mv, ext, extMv: extMvRes };
+  }, [mid]);
 
-  if (err) return <div className="page error">{err}</div>;
-  if (!m) return <div className="page">Chargement…</div>;
+  if (error) return <div className="page"><Alert kind="error">{error}</Alert></div>;
+  if (loading || !data) return <div className="page"><Spinner /></div>;
 
+  const m = data.membre;
+  const hist = data.hist;
+  const ext = data.ext;
   const bloqué = m.statut !== "actif" || m.compte?.statut !== "actif";
 
   return (
@@ -22,11 +47,17 @@ export default function Membre() {
         {m.prenom} {m.nom}
       </h1>
       <p className="lede">
-        {m.code_externe} · adhésion {m.date_adhesion} · {m.anciennete_mois} mois
+        {m.code_externe}
+        {m.occupation ? ` · ${m.occupation}` : ""} · {m.anciennete_mois} mois
+        {m.agence ? ` · ${m.agence.nom}` : ""}
+        {m.telephone ? ` · ${m.telephone}` : ""}
       </p>
+      {m.thin_file && (
+        <div className="banner-thin">Thin-file : historique interne léger. Le moteur le signalera à l’analyse.</div>
+      )}
       <div className="grid two">
         <section className="block">
-          <h2>Compte</h2>
+          <h2>Compte — cette COOPEC</h2>
           {m.compte ? (
             <div className="kv">
               <span>N°</span>
@@ -37,49 +68,138 @@ export default function Membre() {
               <strong>{money(m.compte.solde)}</strong>
               <span>Épargne moy. 6 mois</span>
               <strong>{money(m.compte.epargne_moy_6m)}</strong>
+              <span>Mouvements</span>
+              <strong>{m.nb_mouvements}</strong>
             </div>
           ) : (
             <p>Pas de compte — ouverture obligatoire.</p>
           )}
-          {m.thin_file && <p className="badge warn">Thin-file / historique léger</p>}
         </section>
         <section className="block">
           <h2>Incidents</h2>
-          {m.incidents.length === 0 && <p className="muted">Aucun incident.</p>}
-          {m.incidents.map((i, idx) => (
+          {(hist?.incidents || m.incidents).length === 0 && <p className="muted">Aucun incident.</p>}
+          {(hist?.incidents || m.incidents).map((i, idx) => (
             <p key={idx}>
-              <span className="badge bad">{i.gravite}</span> {i.type} — {i.detail}
+              <span className="badge bad">{i.gravite}</span> {i.type} — {i.detail}{" "}
+              <span className="muted">{i.date}</span>
             </p>
           ))}
         </section>
       </div>
-      <section className="block" style={{ marginTop: "0.9rem" }}>
+
+      <section className="block mt-md">
         <h2>Crédits passés</h2>
         <table>
           <thead>
             <tr>
               <th>Montant</th>
               <th>Statut</th>
+              <th>Source</th>
+              <th>Institution</th>
               <th>Retards</th>
-              <th>Jours max</th>
             </tr>
           </thead>
           <tbody>
-            {m.credits_passes.map((c, i) => (
+            {(hist?.credits_passes || m.credits_passes).map((c, i) => (
               <tr key={i}>
                 <td>{money(c.montant)}</td>
                 <td>{c.statut}</td>
-                <td>{c.nb_retards}</td>
-                <td>{c.jours_max_retard}</td>
+                <td>{c.source || "—"}</td>
+                <td>{c.institution || "agence"}</td>
+                <td>
+                  {c.nb_retards} / {c.jours_max_retard} j
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {m.credits_passes.length === 0 && <p className="muted">Aucun crédit interne.</p>}
+        {(hist?.credits_passes || m.credits_passes).length === 0 && <p className="muted">Aucun crédit passé.</p>}
       </section>
+
+      <section className="block mt-md">
+        <h2>Mouvements agence</h2>
+        <p className="ledger-note">Livre de cette COOPEC seulement — pas mélangé avec un relevé ailleurs.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Montant</th>
+              <th>Libellé</th>
+            </tr>
+          </thead>
+          <tbody>
+            {mvPage.items.map((x, i) => (
+              <tr key={i}>
+                <td>{x.date}</td>
+                <td>{x.type}</td>
+                <td>{money(x.montant)}</td>
+                <td>{x.libelle}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {mvPage.total === 0 && <p className="muted">Aucun mouvement agence.</p>}
+        <Pager
+          page={mvPage.page}
+          pageSize={30}
+          total={mvPage.total}
+          onPage={(p) =>
+            api.mouvements(mid, p).then((r) => setMvPage({ items: r.items, page: r.page, total: r.total }))
+          }
+        />
+      </section>
+
+      {m.nb_comptes_externes > 0 && (
+        <section className="block mt-md">
+          <h2>Ailleurs — autre COOPEC / banque / IMF</h2>
+          <p className="ledger-note">Preuve d’historique hors agence. Pas Flooz / T-Money. Ne change pas le solde local.</p>
+          {ext.map((c) => (
+            <div className="kv mb-sm" key={c.id}>
+              <span>Institution</span>
+              <strong>
+                {c.institution?.nom} ({c.institution?.type})
+              </strong>
+              <span>N° masqué</span>
+              <span>{c.numero_masque}</span>
+              <span>Solde</span>
+              <strong>{money(c.solde)}</strong>
+            </div>
+          ))}
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Montant</th>
+                <th>Libellé</th>
+              </tr>
+            </thead>
+            <tbody>
+              {extMv.items.map((x, i) => (
+                <tr key={i}>
+                  <td>{x.date}</td>
+                  <td>{x.type}</td>
+                  <td>{money(x.montant)}</td>
+                  <td>{x.libelle}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <Pager
+            page={extMv.page}
+            pageSize={30}
+            total={extMv.total}
+            onPage={(p) =>
+              api.mouvementsExternes(mid, p).then((r) => setExtMv({ items: r.items, page: r.page, total: r.total }))
+            }
+          />
+        </section>
+      )}
+
       <div className="actions">
         {bloqué ? (
-          <p className="error">Compte inactif ou gelé : aucune demande possible.</p>
+          <p className="error">Compte inactif / gelé — demande impossible (cas MEM-010).</p>
         ) : (
           <Link className="btn" to={`/membres/${m.id}/demande`}>
             Nouvelle demande

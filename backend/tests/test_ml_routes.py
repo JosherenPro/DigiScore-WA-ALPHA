@@ -166,7 +166,7 @@ def test_simulation_snapshot_relisible(monkeypatch):
         db.commit()
 
 
-def test_alertes_chef_ok_agent_403(monkeypatch):
+def test_alertes_chef_ok_agent_scoped(monkeypatch):
     _enable_ml(monkeypatch)
     r = client.get("/portefeuille/alertes?limit=5", headers=_headers("chef"))
     assert r.status_code == 200, r.text
@@ -179,7 +179,11 @@ def test_alertes_chef_ok_agent_403(monkeypatch):
         assert item["exposure"] >= 0
         assert item["explication"]
 
-    assert client.get("/portefeuille/alertes", headers=_headers("agent")).status_code == 403
+    # L'agent voit aussi ses alertes (Portefeuille lui est ouvert), mais
+    # restreintes a ses propres clients (credit_application.agent_id) — plus
+    # un 403 : c'est le meme module, juste un perimetre plus etroit.
+    agent_r = client.get("/portefeuille/alertes", headers=_headers("agent"))
+    assert agent_r.status_code == 200, agent_r.text
 
 
 def test_scorecard_shadow(monkeypatch):

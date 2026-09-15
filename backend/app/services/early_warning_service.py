@@ -12,7 +12,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.tables import Member, OutstandingLoan, PortfolioFollowup
+from app.models.tables import CreditApplication, Member, OutstandingLoan, PortfolioFollowup
 
 MODEL_VERSION = "early-warning-v1"
 MAX_SCAN = 5000
@@ -38,7 +38,9 @@ def _derived_signals(days_late: int, status: str) -> list[str]:
     return signals
 
 
-def list_alerts(db: Session, *, limit: int = 20, agency_id: int | None = None) -> dict[str, Any]:
+def list_alerts(
+    db: Session, *, limit: int = 20, agency_id: int | None = None, agent_id: int | None = None
+) -> dict[str, Any]:
     stmt = (
         select(OutstandingLoan, Member)
         .join(Member, Member.id == OutstandingLoan.member_id)
@@ -46,6 +48,9 @@ def list_alerts(db: Session, *, limit: int = 20, agency_id: int | None = None) -
     )
     if agency_id is not None:
         stmt = stmt.where(Member.agency_id == agency_id)
+    if agent_id is not None:
+        owned = select(CreditApplication.member_id).where(CreditApplication.agent_id == agent_id).distinct()
+        stmt = stmt.where(Member.id.in_(owned))
     rows = db.execute(stmt.order_by(OutstandingLoan.days_late.desc()).limit(MAX_SCAN)).all()
 
     member_ids = [member.id for _, member in rows]
